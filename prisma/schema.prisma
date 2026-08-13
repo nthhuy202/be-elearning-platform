@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum VerificationType {
+  EMAIL
+  PHONE
+
+  @@map("verification_type")
+}
+
+enum PaymentProvider {
+  STRIPE
+  VNPAY
+  MOMO
+
+  @@map("payment_provider")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+
+  @@map("payment_status")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  fullName        String   @map("full_name")
+  phone           String?  @unique
+  role            Role     @default(STUDENT)
+  isEmailVerified Boolean  @default(false) @map("is_email_verified")
+  isPhoneVerified Boolean  @default(false) @map("is_phone_verified")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  coursesTaught       Course[]             @relation("InstructorCourses")
+  enrollments         Enrollment[]
+  payments            Payment[]
+  verificationTokens  VerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  id         String           @id @default(uuid())
+  userId     String           @map("user_id")
+  type       VerificationType
+  code       String
+  expiresAt  DateTime         @map("expires_at")
+  consumedAt DateTime?        @map("consumed_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Course {
+  id           String   @id @default(uuid())
+  instructorId String   @map("instructor_id")
+  title        String
+  description  String?
+  thumbnailUrl String?  @map("thumbnail_url")
+  price        Int      @default(0)
+  currency     String   @default("VND")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  instructor  User         @relation("InstructorCourses", fields: [instructorId], references: [id], onDelete: Restrict)
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  payments    Payment[]
+
+  @@map("courses")
+}
+
+model Lesson {
+  id         String   @id @default(uuid())
+  courseId   String   @map("course_id")
+  title      String
+  content    String?
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress LessonProgress[]
+
+  @@map("lessons")
+}
+
+model Enrollment {
+  id         String   @id @default(uuid())
+  studentId  String   @map("student_id")
+  courseId   String   @map("course_id")
+  paymentId  String?  @unique @map("payment_id")
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+
+  student        User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  payment        Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  lessonProgress LessonProgress[]
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id           String    @id @default(uuid())
+  enrollmentId String    @map("enrollment_id")
+  lessonId     String    @map("lesson_id")
+  completed    Boolean   @default(false)
+  completedAt  DateTime? @map("completed_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Payment {
+  id                    String          @id @default(uuid())
+  userId                String          @map("user_id")
+  courseId              String          @map("course_id")
+  provider              PaymentProvider
+  providerTransactionId String          @map("provider_transaction_id")
+  amount                Int
+  currency              String
+  status                PaymentStatus   @default(PENDING)
+  paidAt                DateTime?       @map("paid_at")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  enrollment Enrollment?
+
+  @@unique([provider, providerTransactionId])
+  @@map("payments")
+}
