@@ -66,7 +66,7 @@ export class AuthService {
     const user = await this.usersService.findByEmailWithPassword(dto.email);
 
     if (!user) {
-      return MESSAGES.AUTH.FORGOT_PASSWORD_SENT;
+      return;
     }
 
     const rawToken = randomBytes(32).toString('hex');
@@ -91,8 +91,6 @@ export class AuthService {
     if (this.configService.get<string>('NODE_ENV') !== 'production') {
       this.logger.warn(`[DEV ONLY] reset token cho ${user.email}: ${rawToken}`);
     }
-
-    return MESSAGES.AUTH.FORGOT_PASSWORD_SENT;
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -119,8 +117,6 @@ export class AuthService {
         data: { usedAt: new Date() },
       }),
     ]);
-
-    return MESSAGES.AUTH.PASSWORD_RESET_SUCCESS;
   }
 
   private hashResetToken(token: string) {
