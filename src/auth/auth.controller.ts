@@ -17,6 +17,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
 import { MESSAGES } from 'src/common/messages';
+import type { AuthenticatedUser } from './types/authenticated-user.type';
 
 @Controller('auth')
 export class AuthController {
@@ -55,7 +56,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ResponseMessage(MESSAGES.AUTH.GET_PROFILE_SUCCESS)
-  me(@CurrentUser() user: { id: string }) {
+  me(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.findOne(user.id);
   }
 }

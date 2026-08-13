@@ -18,18 +18,24 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
 import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
 import { MESSAGES } from 'src/common/messages';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Role } from 'generated/prisma/enums';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
+  @Roles(Role.ADMIN)
   @ResponseMessage(MESSAGES.USER.CREATE_SUCCESS)
   create(@Body() createUserDto: CreateUsersDto) {
     return this.usersService.register(createUserDto);
   }
 
   @Get()
+  @Roles(Role.ADMIN)
   findAll() {
     return this.usersService.findAll();
   }
@@ -46,18 +52,21 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN)
   @ResponseMessage(MESSAGES.USER.DETAIL_SUCCESS)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN)
   @ResponseMessage(MESSAGES.USER.UPDATE_SUCCESS)
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN)
   @ResponseMessage(MESSAGES.USER.DELETE_SUCCESS)
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
