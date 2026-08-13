@@ -1,1 +1,3 @@
 export const BCRYPT_SALT_ROUNDS = 10;
+export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
+export const PASSWORD_MIN_LENGTH = 8;

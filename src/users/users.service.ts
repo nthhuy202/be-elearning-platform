@@ -11,6 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BCRYPT_SALT_ROUNDS } from 'src/common/constants';
 import { ChangePasswordDto } from 'src/auth/dto/change-password.dto';
+import { MESSAGES } from 'src/common/messages';
 
 const USER_SELECT = {
   id: true,
@@ -34,7 +35,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Email đã tồn tại');
+      throw new ConflictException(MESSAGES.USER.EMAIL_ALREADY_EXISTS);
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
@@ -60,7 +61,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException(`Người dùng không tồn tại`);
+      throw new NotFoundException(MESSAGES.USER.NOT_FOUND);
     }
 
     return user;
@@ -80,7 +81,7 @@ export class UsersService {
     const user = await this.findByIdWithPassword(id);
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy user');
+      throw new NotFoundException(MESSAGES.USER.NOT_FOUND);
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(
@@ -89,11 +90,11 @@ export class UsersService {
     );
 
     if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+      throw new UnauthorizedException(MESSAGES.AUTH.CURRENT_PASSWORD_INCORRECT);
     }
 
     if (dto.currentPassword === dto.newPassword) {
-      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+      throw new BadRequestException(MESSAGES.AUTH.NEW_PASSWORD_MUST_DIFFER);
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
