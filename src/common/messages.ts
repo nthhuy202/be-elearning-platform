@@ -21,6 +21,8 @@ export const MESSAGES = {
     INVALID_OR_EXPIRED_TOKEN: 'Token không hợp lệ hoặc đã hết hạn',
     CURRENT_PASSWORD_INCORRECT: 'Mật khẩu hiện tại không đúng',
     NEW_PASSWORD_MUST_DIFFER: 'Mật khẩu mới phải khác mật khẩu hiện tại',
+    UNAUTHORIZED: 'Bạn cần đăng nhập để thực hiện thao tác này',
+    FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này',
   },
 
   USER: {
