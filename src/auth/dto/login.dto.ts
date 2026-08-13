@@ -1,9 +1,10 @@
 import { IsEmail, IsString } from 'class-validator';
+import { MESSAGES } from 'src/common/messages';
 
 export class LoginDto {
-  @IsEmail()
+  @IsEmail({}, { message: MESSAGES.VALIDATION.EMAIL_INVALID })
   email!: string;
 
-  @IsString()
+  @IsString({ message: MESSAGES.VALIDATION.PASSWORD_INVALID })
   password!: string;
 }
