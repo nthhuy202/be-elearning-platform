@@ -81,7 +81,7 @@ export class CoursesService {
     dto: UpdateCourseDto,
     currentUser: AuthenticatedUser,
   ) {
-    await this.ensureCanModify(id, currentUser);
+    await this.ensureCanModifyCourse(id, currentUser);
 
     return this.prisma.course.update({
       where: { id },
@@ -91,12 +91,12 @@ export class CoursesService {
   }
 
   async remove(id: string, currentUser: AuthenticatedUser) {
-    await this.ensureCanModify(id, currentUser);
+    await this.ensureCanModifyCourse(id, currentUser);
 
     await this.prisma.course.delete({ where: { id } });
   }
 
-  private async ensureCanModify(id: string, currentUser: AuthenticatedUser) {
+  public async ensureCanModify(id: string, currentUser: AuthenticatedUser) {
     const course = await this.prisma.course.findUnique({
       where: { id },
       select: { instructorId: true },
@@ -137,5 +137,34 @@ export class CoursesService {
     }
 
     return where;
+  }
+
+  async ensureCourseExists(id: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException(MESSAGES.COURSE.NOT_FOUND);
+    }
+  }
+
+  async ensureCanModifyCourse(id: string, currentUser: AuthenticatedUser) {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      select: { instructorId: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException(MESSAGES.COURSE.NOT_FOUND);
+    }
+
+    if (
+      currentUser.role !== Role.ADMIN &&
+      course.instructorId !== currentUser.id
+    ) {
+      throw new ForbiddenException(MESSAGES.COURSE.NOT_OWNER);
+    }
   }
 }

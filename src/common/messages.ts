@@ -52,6 +52,17 @@ export const MESSAGES = {
     NOT_OWNER: 'Bạn không phải giảng viên của khoá học này',
   },
 
+  LESSON: {
+    CREATE_SUCCESS: 'Tạo bài học thành công',
+    LIST_SUCCESS: 'Lấy danh sách bài học thành công',
+    DETAIL_SUCCESS: 'Lấy thông tin bài học thành công',
+    UPDATE_SUCCESS: 'Cập nhật bài học thành công',
+    DELETE_SUCCESS: 'Xoá bài học thành công',
+    REORDER_SUCCESS: 'Sắp xếp lại bài học thành công',
+    NOT_FOUND: 'Bài học không tồn tại',
+    REORDER_INVALID_ITEMS: 'Danh sách bài học cần sắp xếp không hợp lệ',
+  },
+
   VALIDATION: {
     EMAIL_INVALID: 'Email không hợp lệ',
     PASSWORD_INVALID: 'Mật khẩu không hợp lệ',
@@ -68,5 +79,8 @@ export const MESSAGES = {
     THUMBNAIL_URL_INVALID: 'Đường dẫn ảnh bìa không hợp lệ',
     PRICE_INVALID: 'Giá phải là số nguyên không âm',
     CURRENCY_INVALID: 'Đơn vị tiền tệ không hợp lệ',
+    CONTENT_INVALID: 'Nội dung bài học không hợp lệ',
+    ORDER_INDEX_INVALID: 'Thứ tự bài học phải là số nguyên không âm',
+    REORDER_ITEMS_REQUIRED: 'Cần ít nhất một bài học để sắp xếp',
   },
 } as const;
