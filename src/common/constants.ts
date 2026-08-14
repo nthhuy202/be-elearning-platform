@@ -12,3 +12,23 @@ export const LESSON_TITLE_MAX_LENGTH = 200;
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 100;
+
+export const VNPAY_VERSION = '2.1.0';
+export const VNPAY_COMMAND = 'pay';
+export const VNPAY_CURRENCY = 'VND';
+export const VNPAY_LOCALE = 'vn';
+export const VNPAY_ORDER_TYPE = 'other';
+export const VNPAY_EXPIRE_MINUTES = 15;
+export const VNPAY_SUCCESS_RESPONSE_CODE = '00';
+
+export const VNPAY_IPN_RESPONSE = {
+  SUCCESS: { RspCode: '00', Message: 'Confirm Success' },
+  ORDER_NOT_FOUND: { RspCode: '01', Message: 'Order not found' },
+  ORDER_ALREADY_CONFIRMED: {
+    RspCode: '02',
+    Message: 'Order already confirmed',
+  },
+  INVALID_AMOUNT: { RspCode: '04', Message: 'Invalid amount' },
+  INVALID_SIGNATURE: { RspCode: '97', Message: 'Invalid signature' },
+  UNKNOWN_ERROR: { RspCode: '99', Message: 'Unknown error' },
+} as const;
