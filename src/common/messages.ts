@@ -39,6 +39,19 @@ export const MESSAGES = {
     EMAIL_ALREADY_EXISTS: 'Email đã tồn tại',
   },
 
+  COURSE: {
+    // --- success ---
+    CREATE_SUCCESS: 'Tạo khoá học thành công',
+    LIST_SUCCESS: 'Lấy danh sách khoá học thành công',
+    DETAIL_SUCCESS: 'Lấy thông tin khoá học thành công',
+    UPDATE_SUCCESS: 'Cập nhật khoá học thành công',
+    DELETE_SUCCESS: 'Xoá khoá học thành công',
+
+    // --- error ---
+    NOT_FOUND: 'Khoá học không tồn tại',
+    NOT_OWNER: 'Bạn không phải giảng viên của khoá học này',
+  },
+
   VALIDATION: {
     EMAIL_INVALID: 'Email không hợp lệ',
     PASSWORD_INVALID: 'Mật khẩu không hợp lệ',
@@ -50,5 +63,10 @@ export const MESSAGES = {
     FULL_NAME_REQUIRED: 'Họ tên không được để trống',
     PHONE_INVALID: 'Số điện thoại không hợp lệ',
     TOKEN_REQUIRED: 'Token không được để trống',
+    TITLE_REQUIRED: 'Tiêu đề khoá học không được để trống',
+    DESCRIPTION_INVALID: 'Mô tả không hợp lệ',
+    THUMBNAIL_URL_INVALID: 'Đường dẫn ảnh bìa không hợp lệ',
+    PRICE_INVALID: 'Giá phải là số nguyên không âm',
+    CURRENCY_INVALID: 'Đơn vị tiền tệ không hợp lệ',
   },
 } as const;
