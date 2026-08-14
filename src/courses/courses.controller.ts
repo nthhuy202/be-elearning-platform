@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
@@ -19,6 +20,7 @@ import { Role } from '../../generated/prisma/client';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { QueryCourseDto } from './dto/query-course.dto';
 
 @Controller('courses')
 export class CoursesController {
@@ -34,8 +36,8 @@ export class CoursesController {
 
   @Get()
   @ResponseMessage(MESSAGES.COURSE.LIST_SUCCESS)
-  findAll() {
-    return this.coursesService.findAll();
+  findAll(@Query() query: QueryCourseDto) {
+    return this.coursesService.findAll(query);
   }
 
   @Get(':id')
