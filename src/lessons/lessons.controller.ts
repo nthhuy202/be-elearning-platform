@@ -25,10 +25,15 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from 'src/auth/types/authenticated-user.type';
 import { QueryLessonDto } from './dto/query-lesson.dto';
 import { ReorderLessonsDto } from './dto/reorder-lessons.dto';
+import { UpdateLessonProgressDto } from 'src/enrollments/dto/update-lesson-progress.dto';
+import { ProgressService } from 'src/enrollments/progress.service';
 
 @Controller('courses/:courseId/lessons')
 export class LessonsController {
-  constructor(private readonly lessonsService: LessonsService) {}
+  constructor(
+    private readonly lessonsService: LessonsService,
+    private readonly progressService: ProgressService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -69,8 +74,21 @@ export class LessonsController {
   findOne(
     @Param('courseId', ParseUUIDPipe) courseId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.lessonsService.findOne(courseId, id);
+    return this.lessonsService.findOne(courseId, id, user);
+  }
+
+  @Patch(':id/progress')
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage(MESSAGES.ENROLLMENT.PROGRESS_UPDATE_SUCCESS)
+  updateProgress(
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateLessonProgressDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.progressService.setLessonProgress(courseId, id, user.id, dto);
   }
 
   @Patch(':id')

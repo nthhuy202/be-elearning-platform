@@ -10,10 +10,11 @@ import { CoursesService } from 'src/courses/courses.service';
 import { AuthenticatedUser } from 'src/auth/types/authenticated-user.type';
 import { QueryLessonDto } from './dto/query-lesson.dto';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from 'src/common/constants';
-import { Prisma } from 'generated/prisma/client';
+import { Prisma, Role } from 'generated/prisma/client';
 import { buildPaginatedResult } from 'src/common/utils/pagination.util';
 import { MESSAGES } from 'src/common/messages';
 import { ReorderLessonsDto } from './dto/reorder-lessons.dto';
+import { EnrollmentsService } from 'src/enrollments/enrollments.service';
 
 const LESSON_LIST_SELECT = {
   id: true,
@@ -34,6 +35,7 @@ export class LessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly coursesService: CoursesService,
+    private readonly enrollmentsService: EnrollmentsService,
   ) {}
 
   async create(
@@ -82,17 +84,27 @@ export class LessonsService {
     return buildPaginatedResult(items, total, page, limit);
   }
 
-  async findOne(courseId: string, id: string) {
+  async findOne(courseId: string, id: string, currentUser: AuthenticatedUser) {
     const lesson = await this.prisma.lesson.findFirst({
       where: { id, courseId },
-      select: LESSON_DETAIL_SELECT,
+      select: {
+        ...LESSON_DETAIL_SELECT,
+        course: { select: { instructorId: true } },
+      },
     });
 
     if (!lesson) {
       throw new NotFoundException(MESSAGES.LESSON.NOT_FOUND);
     }
 
-    return lesson;
+    const { course, ...result } = lesson;
+    const isCourseOwner = course.instructorId === currentUser.id;
+
+    if (!isCourseOwner && currentUser.role !== Role.ADMIN) {
+      await this.enrollmentsService.ensureEnrolled(currentUser.id, courseId);
+    }
+
+    return result;
   }
 
   async update(
@@ -102,7 +114,7 @@ export class LessonsService {
     currentUser: AuthenticatedUser,
   ) {
     await this.coursesService.ensureCanModifyCourse(courseId, currentUser);
-    await this.findOne(courseId, id);
+    await this.ensureLessonInCourse(courseId, id);
 
     return this.prisma.lesson.update({
       where: { id },
@@ -113,7 +125,7 @@ export class LessonsService {
 
   async remove(courseId: string, id: string, currentUser: AuthenticatedUser) {
     await this.coursesService.ensureCanModifyCourse(courseId, currentUser);
-    await this.findOne(courseId, id);
+    await this.ensureLessonInCourse(courseId, id);
 
     await this.prisma.lesson.delete({ where: { id } });
   }
@@ -160,5 +172,16 @@ export class LessonsService {
     });
 
     return lastLesson ? lastLesson.orderIndex + 1 : 0;
+  }
+
+  private async ensureLessonInCourse(courseId: string, id: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id, courseId },
+      select: { id: true },
+    });
+
+    if (!lesson) {
+      throw new NotFoundException(MESSAGES.LESSON.NOT_FOUND);
+    }
   }
 }

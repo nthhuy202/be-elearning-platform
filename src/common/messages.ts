@@ -50,6 +50,7 @@ export const MESSAGES = {
     // --- error ---
     NOT_FOUND: 'Khoá học không tồn tại',
     NOT_OWNER: 'Bạn không phải giảng viên của khoá học này',
+    HAS_ENROLLMENTS: 'Không thể xoá khoá học đã có học viên đăng ký',
   },
 
   LESSON: {
@@ -61,6 +62,21 @@ export const MESSAGES = {
     REORDER_SUCCESS: 'Sắp xếp lại bài học thành công',
     NOT_FOUND: 'Bài học không tồn tại',
     REORDER_INVALID_ITEMS: 'Danh sách bài học cần sắp xếp không hợp lệ',
+  },
+
+  ENROLLMENT: {
+    CREATE_SUCCESS: 'Đăng ký khoá học thành công',
+    LIST_SUCCESS: 'Lấy danh sách đăng ký thành công',
+    DETAIL_SUCCESS: 'Lấy thông tin đăng ký thành công',
+    DELETE_SUCCESS: 'Huỷ đăng ký khoá học thành công',
+    PROGRESS_UPDATE_SUCCESS: 'Cập nhật tiến độ học thành công',
+    PROGRESS_DETAIL_SUCCESS: 'Lấy tiến độ học thành công',
+    NOT_ENROLLED: 'Bạn chưa đăng ký khoá học này',
+    ALREADY_ENROLLED: 'Bạn đã đăng ký khoá học này rồi',
+    REQUIRES_PAYMENT: 'Khoá học này có phí, vui lòng thanh toán để đăng ký',
+    CANNOT_CANCEL_PAID: 'Không thể tự huỷ đăng ký khoá học đã thanh toán',
+    INSTRUCTOR_CANNOT_ENROLL: 'Bạn không thể đăng ký khoá học của chính mình',
+    NOT_FOUND: 'Không tìm thấy đăng ký này',
   },
 
   VALIDATION: {
@@ -82,5 +98,6 @@ export const MESSAGES = {
     CONTENT_INVALID: 'Nội dung bài học không hợp lệ',
     ORDER_INDEX_INVALID: 'Thứ tự bài học phải là số nguyên không âm',
     REORDER_ITEMS_REQUIRED: 'Cần ít nhất một bài học để sắp xếp',
+    COMPLETED_INVALID: 'Trạng thái hoàn thành phải là true hoặc false',
   },
 } as const;

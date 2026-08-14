@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -92,6 +93,14 @@ export class CoursesService {
 
   async remove(id: string, currentUser: AuthenticatedUser) {
     await this.ensureCanModifyCourse(id, currentUser);
+
+    const enrollmentCount = await this.prisma.enrollment.count({
+      where: { courseId: id },
+    });
+
+    if (enrollmentCount > 0) {
+      throw new ConflictException(MESSAGES.COURSE.HAS_ENROLLMENTS);
+    }
 
     await this.prisma.course.delete({ where: { id } });
   }
