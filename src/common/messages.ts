@@ -79,6 +79,16 @@ export const MESSAGES = {
     NOT_FOUND: 'Không tìm thấy đăng ký này',
   },
 
+  PAYMENT: {
+    CREATE_SUCCESS: 'Tạo yêu cầu thanh toán thành công',
+    LIST_SUCCESS: 'Lấy lịch sử thanh toán thành công',
+    RETURN_SUCCESS: 'Lấy kết quả thanh toán thành công',
+    NOT_FOUND: 'Không tìm thấy giao dịch',
+    COURSE_IS_FREE: 'Khoá học này miễn phí, không cần thanh toán',
+    CURRENCY_NOT_SUPPORTED: 'Cổng thanh toán hiện chỉ hỗ trợ VND',
+    INVALID_SIGNATURE: 'Chữ ký giao dịch không hợp lệ',
+  },
+
   VALIDATION: {
     EMAIL_INVALID: 'Email không hợp lệ',
     PASSWORD_INVALID: 'Mật khẩu không hợp lệ',
