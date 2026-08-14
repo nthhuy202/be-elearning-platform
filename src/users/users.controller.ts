@@ -6,8 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  HttpCode,
-  HttpStatus,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -21,6 +19,7 @@ import { MESSAGES } from 'src/common/messages';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Role } from 'generated/prisma/enums';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import type { AuthenticatedUser } from 'src/auth/types/authenticated-user.type';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,16 +35,15 @@ export class UsersController {
 
   @Get()
   @Roles(Role.ADMIN)
+  @ResponseMessage(MESSAGES.USER.LIST_SUCCESS)
   findAll() {
     return this.usersService.findAll();
   }
 
   @Patch('me/password')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
   @ResponseMessage(MESSAGES.USER.CHANGE_PASSWORD_SUCCESS)
   changePassword(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ChangePasswordDto,
   ) {
     return this.usersService.changePassword(user.id, dto);
