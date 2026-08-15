@@ -5,6 +5,7 @@ export const MESSAGES = {
     DUPLICATE_RECORD: 'Dữ liệu đã tồn tại',
     INVALID_REFERENCE: 'Dữ liệu tham chiếu không hợp lệ',
     INTERNAL_ERROR: 'Đã có lỗi xảy ra, vui lòng thử lại sau',
+    TOO_MANY_REQUESTS: 'Bạn thao tác quá nhanh, vui lòng thử lại sau',
   },
 
   AUTH: {
@@ -15,6 +16,13 @@ export const MESSAGES = {
     RESET_PASSWORD_SUCCESS: 'Đặt lại mật khẩu thành công',
     FORGOT_PASSWORD_SENT:
       'Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đi.',
+    VERIFICATION_CODE_SENT: 'Mã xác minh đã được gửi',
+    EMAIL_VERIFIED_SUCCESS: 'Xác minh email thành công',
+    PHONE_VERIFIED_SUCCESS: 'Xác minh số điện thoại thành công',
+    EMAIL_ALREADY_VERIFIED: 'Email đã được xác minh',
+    PHONE_ALREADY_VERIFIED: 'Số điện thoại đã được xác minh',
+    PHONE_NOT_PROVIDED: 'Tài khoản chưa có số điện thoại',
+    INVALID_VERIFICATION_CODE: 'Mã xác minh không đúng hoặc đã hết hạn',
 
     // --- error ---
     INVALID_CREDENTIALS: 'Email hoặc mật khẩu không đúng',
@@ -109,5 +117,6 @@ export const MESSAGES = {
     ORDER_INDEX_INVALID: 'Thứ tự bài học phải là số nguyên không âm',
     REORDER_ITEMS_REQUIRED: 'Cần ít nhất một bài học để sắp xếp',
     COMPLETED_INVALID: 'Trạng thái hoàn thành phải là true hoặc false',
+    VERIFICATION_CODE_INVALID: 'Mã xác minh phải gồm 6 chữ số',
   },
 } as const;

@@ -16,6 +16,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from 'src/auth/types/authenticated-user.type';
 import { QueryPaymentDto } from './dto/query-payment.dto';
 import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('payments')
 export class PaymentsController {
@@ -43,6 +44,7 @@ export class PaymentsController {
   }
 
   @Get('vnpay/ipn')
+  @SkipThrottle()
   @SkipTransform()
   handleVnpayIpn(@Query() query: Record<string, string>) {
     return this.paymentsService.handleVnpayIpn(query);
