@@ -21,6 +21,8 @@ export const VNPAY_ORDER_TYPE = 'other';
 export const VNPAY_EXPIRE_MINUTES = 15;
 export const VNPAY_SUCCESS_RESPONSE_CODE = '00';
 
+export const DEFAULT_EMAIL = 'no-reply@elearning.local';
+
 export const VNPAY_IPN_RESPONSE = {
   SUCCESS: { RspCode: '00', Message: 'Confirm Success' },
   ORDER_NOT_FOUND: { RspCode: '01', Message: 'Order not found' },
@@ -32,3 +34,19 @@ export const VNPAY_IPN_RESPONSE = {
   INVALID_SIGNATURE: { RspCode: '97', Message: 'Invalid signature' },
   UNKNOWN_ERROR: { RspCode: '99', Message: 'Unknown error' },
 } as const;
+
+export const THROTTLE = {
+  DEFAULT: {
+    ttl: 60_000,
+    limit: 100,
+  },
+  LOGIN: { ttl: 60_000, limit: 5 },
+  REGISTER: { ttl: 60_000, limit: 5 },
+  FORGOT_PASSWORD: { ttl: 300_000, limit: 3 },
+  VERIFICATION_REQUEST: { ttl: 300_000, limit: 3 },
+  VERIFICATION_CONFIRM: { ttl: 300_000, limit: 5 },
+};
+
+export const VERIFICATION_CODE_TTL_MINUTES = 10;
+export const VERIFICATION_CODE_MAX = 1_000_000; // mã 6 chữ số: 000000–999999
+export const VERIFICATION_CODE_LENGTH = 6;

@@ -19,6 +19,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MESSAGES } from 'src/common/messages';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { MailService } from 'src/notifications/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -88,9 +90,7 @@ export class AuthService {
       }),
     ]);
 
-    if (this.configService.get<string>('NODE_ENV') !== 'production') {
-      this.logger.warn(`[DEV ONLY] reset token cho ${user.email}: ${rawToken}`);
-    }
+    await this.mailService.sendPasswordResetToken(user.email, rawToken);
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -102,7 +102,7 @@ export class AuthService {
       resetToken && !resetToken.usedAt && resetToken.expiresAt > new Date();
 
     if (!isTokenValid) {
-      throw new BadRequestException(MESSAGES.AUTH.INVALID_CREDENTIALS);
+      throw new BadRequestException(MESSAGES.AUTH.INVALID_OR_EXPIRED_TOKEN);
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
