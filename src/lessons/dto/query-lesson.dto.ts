@@ -1,6 +1,9 @@
 import { IsIn, IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
-import { SORT_ORDERS, type SortOrder } from 'src/courses/dto/query-course.dto';
+import {
+  PaginationQueryDto,
+  SORT_ORDERS,
+  type SortOrder,
+} from 'src/common/dto/pagination-query.dto';
 
 export const LESSON_SORT_FIELDS = ['orderIndex', 'createdAt', 'title'] as const;
 

@@ -1,0 +1,16 @@
+node_modules
+dist
+generated
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+docs
+test
+coverage
+.vscode
+Dockerfile
+.dockerignore
+docker-compose.yml
