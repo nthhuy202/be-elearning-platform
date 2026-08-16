@@ -1,0 +1,52 @@
+mkdir -p .github/workflows
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+2.1.3 — Tạo .github/workflows/ci.yml
+
+mkdir -p .github/workflows
+
+in]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # generated/prisma nằm trong .gitignore nên trên CI nó không tồn tại.
+      # Không sinh lại thì tsc và build sẽ không tìm thấy 'generated/prisma/enums'.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint:ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
