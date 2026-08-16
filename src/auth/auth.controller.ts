@@ -56,7 +56,7 @@ export class AuthController {
 
   @Post('reset-password')
   @Throttle({ default: THROTTLE.LOGIN })
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ResponseMessage(MESSAGES.AUTH.RESET_PASSWORD_SUCCESS)
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);

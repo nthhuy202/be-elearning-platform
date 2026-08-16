@@ -7,14 +7,16 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  PaginationQueryDto,
+  SORT_ORDERS,
+  type SortOrder,
+} from 'src/common/dto/pagination-query.dto';
 import { MESSAGES } from 'src/common/messages';
 
 export const COURSE_SORT_FIELDS = ['createdAt', 'price', 'title'] as const;
-export const SORT_ORDERS = ['asc', 'desc'] as const;
 
 export type CourseSortField = (typeof COURSE_SORT_FIELDS)[number];
-export type SortOrder = (typeof SORT_ORDERS)[number];
 
 export class QueryCourseDto extends PaginationQueryDto {
   @IsOptional()
