@@ -32,4 +32,14 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+    {
+    // E2E test cố ý bám vào JSON thô từ HTTP: `response.body` của supertest là `any`.
+    // Gán kiểu cho nó nghĩa là chép lại response DTO của app sang test — chép sai thì
+    // che mất đúng cái sai lệch mà test sinh ra để bắt.
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
 );

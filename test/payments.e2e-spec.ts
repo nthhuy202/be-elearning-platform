@@ -142,7 +142,8 @@ describe('Payments VNPAY IPN (e2e)', () => {
   });
 
   it('không có chữ ký thì trả 97', async () => {
-    const { vnp_SecureHash, ...unsigned } = ipnQuery({ vnp_TxnRef: txnRef });
+    const unsigned = ipnQuery({ vnp_TxnRef: txnRef });
+    delete unsigned.vnp_SecureHash;
 
     const response = await http()
       .get('/payments/vnpay/ipn')
