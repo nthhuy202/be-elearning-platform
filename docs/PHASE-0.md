@@ -3,7 +3,7 @@
 > Tài liệu tổng hợp toàn bộ Phase 0 của dự án **elearning-platform**: đã xây gì, theo thứ tự nào,
 > vì sao quyết định như vậy, và còn nợ gì trước khi sang Phase 1 (Docker).
 >
-> Cập nhật: 2026-08-15
+> Cập nhật: 2026-08-15 — đã đối chiếu với code thật (bước 0.16 đã áp dụng xong)
 
 ---
 
@@ -11,14 +11,13 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Bước 0.1 → 0.15 | ✅ Đã hoàn thành và chạy được |
-| Bước 0.16 (rate limit + verify + health) | ⏳ Đã có hướng dẫn, **chưa áp dụng vào code** |
+| Bước 0.1 → 0.16 | ✅ Đã hoàn thành và chạy được |
+| Nợ kỹ thuật còn lại | ⚠️ 2 lỗi thật + vài việc dọn dẹp — xem §11 |
 
-Kiểm chứng nhanh bước 0.16 đã áp dụng chưa:
+Phase 0 coi như **đóng** về mặt tính năng. Phần còn lại là sửa lỗi và dọn dẹp, không phải xây mới.
 
 ```bash
-ls src/health src/notifications src/auth/verification.service.ts
-grep -E '"(@nestjs/throttler|nodemailer)"' package.json
+npm run build && npm run lint     # phải sạch trước khi sang Phase 1
 ```
 
 ---
@@ -67,6 +66,7 @@ src/
 │   └── utils/pagination.util.ts
 │
 ├── auth/                       # đăng ký, đăng nhập, quên/đặt lại mật khẩu, xác minh
+│   ├── verification.service.ts # mã 6 số cho email/phone, tách khỏi AuthService
 │   ├── guards/                 # JwtAuthGuard, RolesGuard
 │   ├── strategies/jwt.strategy.ts
 │   └── types/                  # JwtPayload, AuthenticatedUser
@@ -77,8 +77,8 @@ src/
 ├── enrollments/                # đăng ký học + tiến độ (ProgressService)
 ├── payments/                   # VNPAY: tạo giao dịch, IPN, return URL
 │
-├── notifications/              # ⏳ MailService + SmsService (bước 0.16)
-└── health/                     # ⏳ liveness + readiness (bước 0.16)
+├── notifications/              # @Global() — MailService (nodemailer) + SmsService (mock)
+└── health/                     # liveness + readiness
 ```
 
 **Không có thư mục `entities/`** — Prisma model trong `schema.prisma` đóng vai trò đó. Mỗi lần
@@ -172,10 +172,37 @@ VNPAY: tạo giao dịch `PENDING` + URL thanh toán đã ký, IPN xác minh HMA
 `$transaction` chuyển `SUCCEEDED` + tạo enrollment. Thêm `@SkipTransform()` để IPN trả đúng
 định dạng VNPAY yêu cầu.
 
-### 0.16 — ⏳ Đóng Phase 0
+### 0.16 — Đóng Phase 0
 
-Rate limiting (`@nestjs/throttler`), xác minh email (`nodemailer`) / phone (mock),
-health check tự viết (liveness + readiness).
+Ba việc, cố tình làm **đúng thứ tự này**:
+
+**A. Rate limiting** — `ThrottlerModule.forRoot` + `APP_GUARD`, hạn mức khai trong
+`THROTTLE` (`src/common/constants.ts`), gắn `@Throttle()` cho từng route nhạy cảm.
+
+**B. Xác minh email / số điện thoại** — `VerificationService` sinh mã 6 số bằng
+`randomInt`, hash SHA-256 vào bảng `verification_tokens`, TTL 10 phút, dùng một lần.
+`MailService` gửi thật qua nodemailer; `SmsService` mock bằng log.
+
+> A **phải** trước B: mã 6 số chỉ có 1.000.000 khả năng. Không có rate limit thì
+> nó không phải một lớp bảo mật, chỉ là một lớp phiền phức.
+
+**C. Health check** — tự viết 2 endpoint thay vì cài `@nestjs/terminus`
+(quy tắc: không thêm dependency cho thứ 20 dòng làm được).
+
+Cùng lúc đó, log token reset `[DEV ONLY]` bị xoá và thay bằng
+`mailService.sendPasswordResetToken()` — token không bao giờ được xuất hiện trong log.
+
+**Hạn mức đang áp dụng** (`ttl` tính bằng **mili giây** từ throttler v5 trở đi):
+
+| Route | Hạn mức | Vì sao |
+|---|---|---|
+| Mặc định toàn app | 100 / 60s | Trần chung, đủ rộng để không cản người dùng thật |
+| `login`, `reset-password` | 5 / 60s | Chặn dò mật khẩu / dò token |
+| `register` | 3 / 60s | Chặn tạo hàng loạt tài khoản rác |
+| `forgot-password` | 3 / 60s | Mỗi lần gọi là một email thật được gửi đi |
+| `verify/*/request` | 3 / 300s | Mỗi lần gọi tốn một email/SMS |
+| `verify/*/confirm` | 5 / 300s | **Đây mới là lớp chặn brute-force mã 6 số** |
+| IPN, `/health` | `@SkipThrottle()` | Bên gọi là VNPAY và Kubernetes, không phải người dùng |
 
 ---
 
@@ -225,7 +252,7 @@ User ──< Course ──< Lesson
 | POST | `/auth/forgot-password` | 🔓 | luôn 200, body giống nhau dù email có tồn tại hay không |
 | POST | `/auth/reset-password` | 🔓 | |
 | GET | `/auth/me` | 🔑 | |
-| POST | `/auth/verify/{email,phone}/{request,confirm}` | 🔑 ⏳ | mã 6 số, TTL 10 phút |
+| POST | `/auth/verify/{email,phone}/{request,confirm}` | 🔑 | mã 6 số, TTL 10 phút, dùng một lần |
 
 ### users
 
@@ -274,12 +301,15 @@ User ──< Course ──< Lesson
 | GET | `/payments/vnpay/ipn` | 🔓 **xác minh HMAC** · `@SkipThrottle` `@SkipTransform` |
 | GET | `/payments/vnpay/return` | 🔓 chỉ hiển thị, **không cấp quyền** |
 
-### health ⏳
+### health
 
 | Method | Route | Ghi chú |
 |---|---|---|
-| GET | `/health` | liveness — **không** đụng DB |
+| GET | `/health` | liveness — **không** đụng DB, chỉ trả `uptime` |
 | GET | `/health/ready` | readiness — `SELECT 1`, fail → 503 |
+
+Cả hai gắn `@SkipThrottle()` + `@SkipTransform()`: probe của Kubernetes gọi vài giây một lần
+(không được tính vào hạn mức) và đọc JSON phẳng (không hiểu envelope).
 
 ---
 
@@ -316,7 +346,8 @@ phải query DB mỗi request, đánh đổi bằng hiệu năng.
 | `amount` **không** nằm trong DTO | Server tự đọc `courses.price`. Để client gửi = bán lỗ |
 | Route webhook **không** có `JwtAuthGuard` | VNPAY không có JWT của user. Chữ ký HMAC thay thế vai trò guard |
 | Chỉ IPN được cấp enrollment, Return URL thì không | Return URL nằm trên thanh địa chỉ trình duyệt, người dùng sửa query string được |
-| Rate limit login / forgot-password / verify ⏳ | Không có nó, mã OTP 6 số bị dò hết 1.000.000 khả năng trong vài phút |
+| Rate limit login / forgot-password / verify | Không có nó, mã 6 số bị dò hết 1.000.000 khả năng trong vài phút. Đây là thứ *duy nhất* làm mã ngắn trở nên an toàn |
+| Mã xác minh hash SHA-256, dùng một lần, cấp mới huỷ cũ | Hash 6 chữ số về mặt toán học là yếu (dò ngược trong vài giây). Cái bảo vệ nó là TTL ngắn + số lần thử bị giới hạn, không phải thuật toán hash |
 | Tiền lưu số nguyên | `0.1 + 0.2 === 0.30000000000000004` |
 
 ---
@@ -387,31 +418,37 @@ là lãng phí băng thông thuần tuý.
 | Thiếu `exports` trong module | `Nest can't resolve dependencies of…` | `exports` ở module nguồn **và** `imports` ở module đích |
 | Liveness probe đụng DB | DB restart 30s → **CrashLoopBackOff** toàn hệ thống | Liveness không đụng DB; chỉ readiness mới đụng |
 | Rate limit sau proxy | Mọi user dùng chung 1 hạn mức | `app.set('trust proxy', 1)` — **đừng** dùng `true` |
+| `ttl` của throttler | Đặt `60` tưởng là 60 giây, thực ra là 60**ms** → gần như không giới hạn | Từ v5 `ttl` tính bằng mili giây: `60_000` |
 | `configService.get('Port')` | Im lặng bỏ qua `.env`, chạy nhờ `?? 8080` | Key trong `.env` là `PORT` |
+| `.env.example` lệch với code | Người mới clone về chạy lỗi ở runtime, không phải lúc build | Mỗi lần thêm `getOrThrow('X')` phải thêm `X=` vào `.env.example` ngay |
 
 ---
 
 ## 11. Nợ kỹ thuật
 
-### Cần sửa (lỗi thật trong code hiện tại)
+### Cần sửa (lỗi thật, còn trong code)
 
-| Vị trí | Vấn đề |
-|---|---|
-| `src/auth/auth.controller.ts:50` | `@HttpCode(NO_CONTENT)` ở `reset-password` → envelope bị nuốt. Đổi sang `OK` |
-| `src/auth/auth.service.ts:105` | `resetPassword` ném `INVALID_CREDENTIALS`, đúng phải là `INVALID_OR_EXPIRED_TOKEN` |
-| `src/users/users.controller.ts:44` | `@HttpCode(NO_CONTENT)` ở `me/password` → cùng lỗi trên |
-| `src/users/users.controller.ts:39` | `findAll` thiếu `@ResponseMessage` |
-| `src/users/users.controller.ts:45` | `@UseGuards(JwtAuthGuard)` thừa (đã có ở cấp class) |
-| `src/users/users.controller.ts:48` | Inline type `{ id: string }` thay vì `AuthenticatedUser` |
-| `src/main.ts:25` | `configService.get('Port')` — sai hoa/thường, phải là `'PORT'` |
+| Vị trí | Vấn đề | Sửa |
+|---|---|---|
+| `src/auth/auth.controller.ts:59` | `@HttpCode(NO_CONTENT)` ở `reset-password` → 204 không được có body, envelope bị Node cắt bỏ, client nhận response rỗng không có `message` | `HttpStatus.OK` |
+| `src/main.ts:25` | `configService.get('Port')` sai hoa/thường → `.env` bị bỏ qua hoàn toàn, chạy được chỉ nhờ `?? 8080` che đi | `'PORT'` |
+| `.env.example` | Thiếu `JWT_SECRET` (code dùng `getOrThrow` → clone repo về là crash lúc khởi động) | Thêm `JWT_SECRET=` |
+| `.env.example` | Có `PASSWORD_SALT=` nhưng không chỗ nào đọc — salt rounds là hằng số trong `constants.ts` | Xoá dòng đó |
+
+> Đã sửa xong: 4 vấn đề ở `users.controller.ts`, message sai ở `auth.service.ts:105`,
+> và log `[DEV ONLY]` in token reset.
 
 ### Dọn dẹp
 
-- `SORT_ORDERS` / `SortOrder` đang nằm trong `src/courses/dto/query-course.dto.ts` nhưng được
+- `SORT_ORDERS` / `SortOrder` nằm trong `src/courses/dto/query-course.dto.ts` nhưng đang bị
   `lessons`, `enrollments`, `payments` import chéo → chuyển sang `src/common/dto/pagination-query.dto.ts`.
+  Hiện tại module `payments` phải phụ thuộc vào module `courses` chỉ để lấy một mảng 2 phần tử.
 - `ParseUUIDPipe` còn thiếu ở `courses.controller.ts` và `users.controller.ts`.
-- `src/payments/dto/update-payment.dto.ts` là file thừa do CLI sinh, chưa dùng.
+- `src/payments/dto/update-payment.dto.ts` — file thừa do CLI sinh, không ai dùng.
 - `src/app.controller.ts` / `app.service.ts` / `app.controller.spec.ts` vẫn là boilerplate `getHello()`.
+  `/health` đã thay vai trò "endpoint kiểm tra app sống" rồi.
+- Chưa gọi `app.set('trust proxy', 1)` trong `main.ts`. Chạy local thì không sao, nhưng từ Phase 1
+  (Docker → ingress) mọi request sẽ mang cùng một IP nội bộ và rate limit sẽ tính chung cho tất cả.
 
 ### Hoãn có chủ đích
 
@@ -431,7 +468,7 @@ là lãng phí băng thông thuần tuý.
 
 ## 12. Kiểm thử thủ công quan trọng nhất
 
-Nếu chỉ chạy được 6 case trước khi sang Phase 1, chạy đúng 6 case này:
+Nếu chỉ chạy được 8 case trước khi sang Phase 1, chạy đúng 8 case này:
 
 | # | Case | Kỳ vọng | Nếu sai thì sao |
 |---|---|---|---|
@@ -441,20 +478,48 @@ Nếu chỉ chạy được 6 case trước khi sang Phase 1, chạy đúng 6 ca
 | 4 | `POST /enrollments` với khoá **có phí** | `400 REQUIRES_PAYMENT` | Toàn bộ doanh thu bị bỏ ngỏ |
 | 5 | `PATCH /courses/A/lessons/<bài-của-B>` khi là chủ khoá A | `404` | Xoá được nội dung của người khác |
 | 6 | `GET /courses/:id/lessons/:id` khi chưa đăng ký | `403` | Nội dung khoá có phí đọc được miễn phí |
+| 7 | `POST /auth/login` sai mật khẩu **6 lần liên tiếp** | Lần thứ 6 trả `429` | Rate limit chỉ tồn tại trên giấy; dò mật khẩu thoải mái |
+| 8 | Dùng lại mã xác minh đã confirm thành công | `400`, không phải `200` | Mã dùng một lần bị biến thành mã vĩnh viễn |
 
 ---
 
-## 13. Chuẩn bị cho Phase 1 — Docker
+## 13. Biến môi trường
+
+Không có schema validate `.env` (Joi/Zod) — hoãn có chủ đích. Bù lại, biến nào thiếu mà app
+không chạy được thì đọc bằng `getOrThrow()` để **fail ngay lúc khởi động**, không phải lúc
+người dùng đầu tiên gọi API.
+
+| Biến | Bắt buộc | Dùng ở | Ghi chú |
+|---|---|---|---|
+| `PORT` | không | `main.ts` | mặc định 8080 |
+| `NODE_ENV` | không | Prisma log level | |
+| `DATABASE_URL` | **có** | `PrismaService` | local dùng port **5433** |
+| `JWT_SECRET` | **có** | `JwtModule`, `JwtStrategy` | ⚠️ chưa có trong `.env.example` |
+| `VNPAY_TMN_CODE` | **có** | `VnpayService` | |
+| `VNPAY_HASH_SECRET` | **có** | `VnpayService` | khoá ký HMAC-SHA512 |
+| `VNPAY_PAY_URL` | **có** | `VnpayService` | |
+| `VNPAY_RETURN_URL` | **có** | `VnpayService` | phải đổi khi deploy |
+| `SMTP_HOST` / `PORT` / `USER` / `PASSWORD` / `FROM` | **có** | `MailService` | |
+
+**Quy tắc:** `.env` không bao giờ commit; `.env.example` luôn commit và luôn phải khớp với
+những gì code thật sự đọc. Đây là file đầu tiên Phase 1 sẽ dùng để viết `environment:` trong
+`docker-compose.yml`.
+
+---
+
+## 14. Chuẩn bị cho Phase 1 — Docker
 
 Những thứ Phase 0 để lại và Phase 1 sẽ dùng ngay:
 
 | Có sẵn | Dùng làm gì ở Phase 1 |
 |---|---|
-| `/health/ready` ⏳ | `HEALTHCHECK` trong Dockerfile và `depends_on: condition: service_healthy` |
+| `/health` | `livenessProbe` — không đụng DB nên DB restart không giết container |
+| `/health/ready` | `HEALTHCHECK` của Dockerfile và `depends_on: condition: service_healthy` |
 | `PORT` qua `ConfigService` | `EXPOSE` + biến môi trường của container |
 | Mọi secret qua `.env` | Không có gì bị nướng vào image |
-| `.env.example` | Nói cho người khác biết cần cấu hình gì |
+| `.env.example` | Khung để viết `environment:` trong `docker-compose.yml` |
 | `prisma migrate deploy` | Bước khởi động container (khác `migrate dev` của môi trường dev) |
+| `generated/prisma/` | ⚠️ **Không** copy vào image — phải `prisma generate` lại trong tầng build, vì client sinh ra phụ thuộc nền tảng |
 
 Việc của Phase 1: multi-stage `Dockerfile` (build → runtime gọn), `.dockerignore`,
 `docker-compose.yml` gộp app + Postgres, và xử lý `prisma generate` / `migrate deploy`

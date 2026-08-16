@@ -16,3 +16,6 @@ export class PaginationQueryDto {
   @Max(MAX_PAGE_SIZE)
   limit?: number = DEFAULT_PAGE_SIZE;
 }
+
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+export type SortOrder = (typeof SORT_ORDERS)[number];
