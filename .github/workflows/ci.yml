@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
 
+# Push liên tiếp lên cùng 1 PR: huỷ run cũ, chỉ giữ run mới nhất.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mặc định GITHUB_TOKEN có quyền ghi. Siết về chỉ-đọc; job nào cần
+# thêm thì tự khai ở cấp job (2.4 cần packages: write để push ghcr).
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest

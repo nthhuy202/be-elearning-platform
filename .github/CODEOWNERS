@@ -1,0 +1,10 @@
+# Mặc định: mọi thay đổi cần chủ repo review.
+*                   @nthhuy202
+
+# Vùng nhạy cảm — khi có team, đổi thành người/nhóm chuyên trách.
+# Sai ở đây là mất tiền hoặc mất dữ liệu, không phải chỉ xấu code.
+/prisma/            @nthhuy202
+/src/payments/      @nthhuy202
+/src/auth/          @nthhuy202
+/.github/           @nthhuy202
+/Dockerfile         @nthhuy202
