@@ -29,9 +29,7 @@ kind: Deployment
 metadata:
   name: api
 spec:
-  # Còn 1 vì migration đang chạy trong CMD của image — nhiều replica sẽ
-  # cùng chạy `prisma migrate deploy` một lúc. 3.3 tách ra Job rồi mới tăng.
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: api
@@ -44,7 +42,7 @@ spec:
         - name: api
           # Tag bất biến theo commit SHA — đúng thứ dựng ra ở bước 2.4.
           # Đổi đúng dòng này chính là "deploy". Không bao giờ dùng :latest.
-          image: ghcr.io/nthhuy202/be-elearning-platform:4ecad923a686156977a23c5353b819310dbc1e1d
+          image: elearning-api:3.3
           imagePullPolicy: IfNotPresent
 
           envFrom:
@@ -58,13 +56,13 @@ spec:
               containerPort: 8080
 
           # Chạy trước, và tạm dừng hai probe kia cho tới khi nó xanh.
-          # Cần vì container còn phải `prisma migrate deploy` trước khi listen.
+          # Container giờ chỉ boot Nest, không migrate nữa -> ngưỡng thấp là đủ.
           startupProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 3
-            failureThreshold: 40      # tối đa 2 phút
+            failureThreshold: 10
 
           # Còn sống không? Không đụng DB — DB chết thì giết app là sai.
           livenessProbe:
