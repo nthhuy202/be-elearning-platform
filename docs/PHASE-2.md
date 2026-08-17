@@ -13,10 +13,11 @@
 | **2.0.1** | Hạ tầng test: DB riêng, reset dữ liệu, app helper | ✅ |
 | **2.0.2** | Test luồng auth — 14 test | ✅ |
 | **2.0.3** | Test luồng payment IPN — 7 test | ✅ |
-| 2.1 | GitHub Actions: `lint` + `typecheck` + `build` | ⏳ |
-| 2.2 | Postgres service container trong CI | ⏳ |
-| 2.3 | Build Docker image trong CI, dùng cache GitHub | ⏳ |
-| 2.4 | Đẩy image lên `ghcr.io`, tag theo commit SHA | ⏳ |
+| **2.1** | GitHub Actions: `lint` + `typecheck` + `build` | ✅ |
+| **2.2** | Postgres service container trong CI | ✅ |
+| **2.3** | Build Docker image trong CI, dùng cache GitHub | ✅ |
+| **2.4** | Đẩy image lên `ghcr.io`, tag theo commit SHA | ✅ |
+| **2.5** | Bảo vệ `main` + quy ước làm việc nhóm trên GitHub | ✅ |
 
 ---
 
@@ -236,3 +237,284 @@ function ipnQuery(overrides: Record<string, string>) {
 ```
 
 Khai báo kiểu trả về tường minh là xong: `): Record<string, string> {`.
+
+---
+
+## Bước 2.1 — GitHub Actions: lint, typecheck, build
+
+`.github/workflows/ci.yml`, job `check`. Chạy trên mọi PR và mọi push vào `main`.
+
+```yaml
+- run: npm ci
+- run: npx prisma generate     # bắt buộc, xem bên dưới
+- run: npm run lint:ci
+- run: npx tsc --noEmit
+- run: npm run build
+```
+
+### Hai thứ không hiển nhiên
+
+**`npx prisma generate` phải chạy trước mọi thứ khác.** `generated/prisma` nằm trong
+`.gitignore` nên trên máy CI nó không tồn tại. Thiếu bước này thì `tsc` và `build` đều
+chết ở `Cannot find module 'generated/prisma/enums'` — trong khi ở máy local vẫn xanh,
+vì thư mục đó đã được sinh từ lần `prisma generate` nào đó trước kia.
+
+**`npm run lint` không dùng làm cổng chặn được.** Script đó có `--fix`: nó tự sửa rồi
+báo thành công, CI sẽ xanh với một repo mà code chưa hề được sửa. Cần một script riêng
+không có `--fix`:
+
+```json
+"lint:ci": "eslint \"{src,apps,libs,test}/**/*.ts\""
+```
+
+Lần chạy đầu tiên của `lint:ci` cho **26 lỗi**, toàn bộ nằm trong `test/` và chưa từng
+thấy bao giờ — chính vì `npm run lint` đã âm thầm sửa chúng ở local. Chủ yếu là
+`no-unsafe-member-access` trên `response.body.data`: supertest trả `any`.
+
+Xử lý bằng một override cuối `eslint.config.mjs` thay vì rắc `as` khắp test:
+
+```js
+{
+  files: ['test/**/*.ts'],
+  rules: {
+    '@typescript-eslint/no-unsafe-assignment': 'off',
+    '@typescript-eslint/no-unsafe-member-access': 'off',
+  },
+}
+```
+
+Lý do không gán kiểu cho `response.body`: làm vậy là chép lại response DTO của app sang
+test. Chép sai thì test vẫn xanh trong khi app trả sai — che mất đúng cái sai lệch mà
+test sinh ra để bắt.
+
+### Kèm theo: gỡ `.env.test` khỏi `.gitignore`
+
+File này chứa toàn giá trị giả (`JWT_SECRET=test-secret-only`,
+`VNPAY_HASH_SECRET=TESTHASHSECRET`, DB trỏ localhost). Không commit thì bước 2.2
+không có gì để chạy.
+
+---
+
+## Bước 2.2 — Postgres service container
+
+Job **riêng** tên `e2e`. Phải là job riêng vì `services:` gắn container vào toàn bộ job,
+không gắn được cho một step.
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: elearning_test
+    ports:
+      - 5433:5432
+    options: >-
+      --health-cmd "pg_isready -U postgres"
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+```
+
+| Chi tiết | Vì sao |
+|---|---|
+| `5433:5432` | Trùng với `docker compose` ở local, nên `.env.test` dùng nguyên xi cho cả hai nơi. Không cần biến môi trường riêng cho CI |
+| `--health-cmd` | Runner **chờ** container healthy rồi mới chạy step đầu tiên. Không có nó thì test nối vào một Postgres chưa kịp mở cổng, và fail ngẫu nhiên |
+| `POSTGRES_DB: elearning_test` | Tạo sẵn database, khỏi phải `psql -c "CREATE DATABASE"` như ở local |
+
+### Bẫy — `prisma.config.ts` nạp `.env`, không phải `.env.test`
+
+Bước migrate phải truyền `DATABASE_URL` tường minh, dù `.env.test` đã có sẵn biến đó:
+
+```yaml
+- name: Migrate test database
+  run: npx prisma migrate deploy
+  env:
+    DATABASE_URL: postgresql://postgres:postgres@localhost:5433/elearning_test?schema=public
+```
+
+`.env.test` chỉ được `test/setup-e2e.ts` nạp vào lúc Jest khởi động — Prisma CLI chạy ở
+tiến trình khác, hoàn toàn không biết file đó tồn tại.
+
+---
+
+## Bước 2.3 — Build Docker image với cache GitHub
+
+Job `docker`, `needs: [check, e2e]` — lint hoặc test đỏ thì khỏi tốn hai phút build.
+
+```yaml
+- uses: docker/setup-buildx-action@v3
+- uses: docker/build-push-action@v6
+  with:
+    context: .
+    push: false
+    cache-from: type=gha
+    cache-to: type=gha,mode=max
+```
+
+| Dòng | Vì sao |
+|---|---|
+| `setup-buildx-action` | Driver `docker` mặc định **không** hỗ trợ cache exporter. Thiếu bước này thì `cache-to` bị bỏ qua **im lặng** — không lỗi, không cảnh báo, chỉ là lần nào cũng build lại từ đầu |
+| `type=gha` | Cache layer đẩy vào GitHub Actions Cache API. Không cần registry, không cần secret |
+| `mode=max` | Mặc định `mode=min` chỉ cache layer có mặt trong image cuối. Image cuối là stage `runner`, **không** chứa `npm ci` + `npm run build` của stage `builder` — tức là cache đúng phần đắt nhất bị bỏ qua |
+
+Chỗ này cũng là lúc thấy được vì sao `Dockerfile` copy `package*.json` **trước** `COPY . .`:
+commit không đụng dependency thì `npm ci` hiện `CACHED`. Đảo hai dòng đó là mọi commit đều
+cài lại toàn bộ node_modules.
+
+### Kèm theo: siết workflow
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+```
+
+`concurrency` huỷ run cũ khi push đè lên cùng một PR — mỗi run tốn 3 job, trong đó `e2e`
+dựng cả container Postgres. `permissions` hạ `GITHUB_TOKEN` từ quyền-ghi-mặc-định về
+chỉ-đọc; job nào cần hơn thì tự khai ở cấp job (2.4).
+
+---
+
+## Bước 2.4 — Push image lên `ghcr.io`
+
+```yaml
+docker:
+  permissions:
+    contents: read
+    packages: write          # nới cho riêng job này
+
+  steps:
+    - name: Log in to ghcr.io
+      if: github.event_name == 'push'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: docker/build-push-action@v6
+      with:
+        push: ${{ github.event_name == 'push' }}
+        tags: |
+          ghcr.io/${{ github.repository }}:${{ github.sha }}
+          ghcr.io/${{ github.repository }}:latest
+```
+
+**PR build nhưng không push.** Vẫn bắt được lỗi Dockerfile trước khi vào `main`, vẫn nạp
+cache, nhưng không đẻ image rác trong registry. PR từ fork cũng không được cấp
+`packages: write` nên đăng nhập sẽ fail — do đó bước login có `if`.
+
+**Không cần tạo secret nào.** `GITHUB_TOKEN` do Actions tự cấp mỗi run và hết hạn khi run
+kết thúc. Dùng PAT ở đây là tự tạo ra một secret sống mãi không cần thiết.
+
+### Ba điều dễ hoang mang lần đầu
+
+- **Package mặc định private** dù repo public. Không sửa thì Phase 3 phải tạo
+  `imagePullSecret` chỉ vì chuyện này. Sửa ở `profile → Packages → Package settings → Change visibility`.
+- **Xuất hiện dòng `unknown/unknown`** trong danh sách platform — đó là manifest
+  attestation buildx sinh mặc định, không phải lỗi. Thêm `provenance: false` nếu muốn sạch.
+- **`ghcr.io` bắt buộc chữ thường.** `${{ github.repository }}` trả nguyên văn tên repo;
+  repo có chữ hoa sẽ fail `invalid reference format`, lúc đó mới cần `docker/metadata-action`.
+
+**`latest` chỉ để `docker pull` thử cho nhanh.** Nó trỏ chỗ khác sau mỗi lần merge —
+deploy bằng `latest` là rollback mà không biết đang về đâu. Từ Phase 3, manifest K8s luôn
+ghi SHA. Đó là lý do bước này tồn tại.
+
+### Kiểm chứng
+
+```bash
+docker pull ghcr.io/nthhuy202/be-elearning-platform:$(git rev-parse HEAD)
+```
+
+Kết quả: 804MB trên đĩa / 175MB nén. Xem mục nợ kỹ thuật.
+
+---
+
+## Bước 2.5 — Bảo vệ `main` và quy ước làm việc nhóm
+
+### Điều kiện: repo phải public
+
+Trên gói Free, **ruleset/branch protection và secret scanning chỉ có với repo public**.
+Repo private cần Team trở lên. Dấu hiệu nhận biết: trang `Settings → Advanced Security`
+không có mục Secret scanning, chỉ có Dependency graph và Dependabot.
+
+Project này chuyển sang public — không có gì để lộ (`.env` chưa từng được commit,
+`.env.test` toàn giá trị giả) và public còn được Actions minutes không giới hạn.
+
+### Ruleset `protect-main`
+
+`Settings → Rules → Rulesets → New branch ruleset`, target `Include default branch`,
+enforcement **Active**, **bypass list để trống**.
+
+- ☑ Restrict deletions · Block force pushes · Require linear history
+- ☑ Require a pull request before merging
+  - Required approvals: **0**
+  - ☑ Dismiss stale approvals · Require review from Code Owners · Require conversation resolution
+- ☑ Require status checks to pass
+  - ☑ Require branches to be up to date before merging
+  - Checks: `check`, `e2e`, `docker`
+
+| Bẫy | Thực tế |
+|---|---|
+| Chọn check tên `CI` | Sai. `CI` là tên **workflow**; phải chọn tên **job**. Chọn nhầm thì PR treo vĩnh viễn ở "Expected" vì chờ một check không tồn tại |
+| Check chưa hiện trong ô search | Check phải chạy ít nhất một lần mới xuất hiện. Làm ruleset **sau** khi 2.3/2.4 đã chạy |
+| Required approvals = 1 khi làm một mình | Tự khoá cửa nhốt mình bên ngoài — không ai tự approve PR của mình được. Để 0, đổi lên 1 khi có người thứ hai |
+| Tên mình trong bypass list | Mọi luật ở trên trở thành gợi ý, và sẽ push thẳng vào `main` lúc 11h đêm mà không biết mình đang bypass |
+
+Kiểm chứng bằng cách thử phá — chưa thử thì chưa biết khoá có khoá thật không:
+
+```bash
+git checkout main && echo "# test" >> README.md && git commit -am "test" && git push
+# mong đợi: GH013: Repository rule violations found
+git reset --hard origin/main
+```
+
+### Merge settings
+
+`Settings → General → Pull Requests`: chỉ bật **squash merge** (bỏ merge commit và
+rebase), default commit message = `Pull request title and description`, bật
+**Allow auto-merge** và **Automatically delete head branches**.
+
+`Allow auto-merge` là thứ trả lời đúng câu "CI xanh mới được merge": mở PR → bấm
+*Enable auto-merge* → CI xanh đủ 3 job thì GitHub tự merge, tự xoá nhánh. Xoá nhánh tự
+động cũng chặn luôn lỗi từng gặp: push tiếp vào một nhánh đã merge.
+
+Squash + linear history: `main` thành một dòng thẳng, mỗi commit là một PR trọn vẹn,
+`git revert` một tính năng là một lệnh.
+
+### Các file quy ước
+
+| File | Vai trò |
+|---|---|
+| `.github/CODEOWNERS` | Ghi "ai chịu trách nhiệm cái gì" bằng code thay vì bằng trí nhớ. Đụng `prisma/`, `src/payments/`, `src/auth/` là tự kéo đúng người vào PR |
+| `.github/pull_request_template.md` | Checklist chỉ giữ những dòng mà quên là **đau thật** (migration, DTO, secret, e2e). Dài quá thì người ta tick hết mà không đọc |
+| `.github/dependabot.yml` | npm + **github-actions**, weekly, gom minor/patch vào 1 PR |
+
+Phần `github-actions` quan trọng ngang phần npm: `actions/checkout@v4` cũng có lỗ hổng, và
+nó chạy với quyền ghi vào repo. PR của Dependabot cũng phải qua đủ 3 job CI — bot không có
+đặc quyền.
+
+### Advanced Security
+
+Bật theo thứ tự (mục dưới bị khoá nếu chưa bật mục trên): Dependency graph → Dependabot
+alerts → Dependabot security updates → Grouped security updates → **Secret scanning** →
+**Push protection**.
+
+Push protection là cái đáng giá nhất: nó chặn ngay lúc `git push`. Secret scanning thường
+chỉ báo *sau khi* secret đã lên GitHub — và lúc đó xoá commit **không đủ**, phải đi xoay key.
+
+---
+
+## Nợ kỹ thuật ghi nhận ở Phase 2
+
+| Món | Chi tiết |
+|---|---|
+| Image 804MB | Thủ phạm gần như chắc chắn là `@prisma/engines` trong `npm ci --omit=dev` ở stage runner. Chỉ tối ưu nếu Phase 3 thấy pull image chậm |
+| Không e2e test được rate limiting | Đánh đổi của `skipIf` (bẫy #5). Hành vi đã kiểm thử tay ở Phase 0 §12 |
+| `provenance` chưa tắt | Package hiện dòng `unknown/unknown`. Vô hại |
+| Migration vẫn nằm trong `CMD` của Dockerfile | Tách thành K8s Job ở Phase 3 |
