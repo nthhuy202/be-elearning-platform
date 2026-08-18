@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api
+data:
+  # Mọi value trong ConfigMap PHẢI là chuỗi. Viết PORT: 8080 không nháy kép
+  # thì YAML hiểu là số và K8s từ chối: "cannot unmarshal number into string".
+  NODE_ENV: 'production'
+  PORT: '8080'
+  JWT_EXPIRES_IN: '1h'
+  VNPAY_TMN_CODE: 'TESTTMN'
+  VNPAY_PAY_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
+  VNPAY_RETURN_URL: 'http://localhost/payments/vnpay/return'
+---
+# Giá trị dev cho cluster local. Phase 5 chuyển sang Sealed Secrets.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api
+type: Opaque
+stringData:
+  # Tên host là tên Service ở 3.1, cùng namespace nên gọi trống không được.
+  DATABASE_URL: 'postgresql://postgres:postgres@postgres:5432/elearning?schema=public'
+  JWT_SECRET: 'dev-secret-doi-o-phase-5'
+  VNPAY_HASH_SECRET: 'TESTHASHSECRET'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  # Còn 1 vì migration đang chạy trong CMD của image — nhiều replica sẽ
+  # cùng chạy `prisma migrate deploy` một lúc. 3.3 tách ra Job rồi mới tăng.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          # Tag bất biến theo commit SHA — đúng thứ dựng ra ở bước 2.4.
+          # Đổi đúng dòng này chính là "deploy". Không bao giờ dùng :latest.
+          image: ghcr.io/nthhuy202/be-elearning-platform:4ecad923a686156977a23c5353b819310dbc1e1d
+          imagePullPolicy: IfNotPresent
+
+          envFrom:
+            - configMapRef:
+                name: api
+            - secretRef:
+                name: api
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          # Chạy trước, và tạm dừng hai probe kia cho tới khi nó xanh.
+          # Cần vì container còn phải `prisma migrate deploy` trước khi listen.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 3
+            failureThreshold: 40      # tối đa 2 phút
+
+          # Còn sống không? Không đụng DB — DB chết thì giết app là sai.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+
+          # Nhận request được chưa? Có đụng DB (SELECT 1).
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8080
+      targetPort: http
