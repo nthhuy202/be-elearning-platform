@@ -51,7 +51,7 @@ spec:
         - name: api
           # Nợ lớn nhất của Phase 3 chết ở đây: tag định nghĩa đúng MỘT chỗ,
           # api và migrate job cùng đọc.
-          image: {{ printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) | quote }}
+          image: {{ include "elearning.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
           envFrom:
