@@ -1,0 +1,6 @@
+# Template Helm không phải YAML hợp lệ. Prettier parse {{ }} thành flow
+# mapping rồi in lại là "{ { } }", làm hỏng template.
+helm/
+
+dist/
+generated/
