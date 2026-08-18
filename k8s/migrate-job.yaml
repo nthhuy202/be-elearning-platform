@@ -18,7 +18,7 @@ spec:
         - name: migrate
           # Cùng image với app: migration nằm trong prisma/migrations của chính
           # commit đó. Dùng image khác là nguy cơ chạy nhầm phiên bản migration.
-          image: elearning-api:3.3
+          image: elearning-api:3.4
           imagePullPolicy: IfNotPresent
           command: ['npx', 'prisma', 'migrate', 'deploy']
           envFrom:
