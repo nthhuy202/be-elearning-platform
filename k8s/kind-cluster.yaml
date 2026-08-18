@@ -1,0 +1,22 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: elearning
+
+nodes:
+  - role: control-plane
+
+    # ingress-nginx chỉ chịu chạy trên node có nhãn này. Khai sẵn từ bây giờ
+    # để bước 3.4 không phải xoá cluster dựng lại.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+
+    # Node là container, nên cổng của nó không tự thông ra máy thật.
+    # Không có phần này thì Ingress dựng xong vẫn không gõ được từ trình duyệt.
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
