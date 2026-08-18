@@ -67,6 +67,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
 
   # Mỗi replica được cấp PVC riêng, và PVC KHÔNG bị xoá khi pod chết.
   volumeClaimTemplates:
