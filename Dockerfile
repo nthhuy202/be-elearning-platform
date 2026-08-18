@@ -25,4 +25,4 @@ COPY prisma.config.ts ./
 USER node
 EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/src/main"]
+CMD ["node", "dist/src/main"]
