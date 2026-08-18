@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  annotations:
+    # post-install: lần cài đầu, Postgres phải tồn tại trước đã.
+    # pre-upgrade: các lần sau, migration chạy TRƯỚC khi pod code mới lên.
+    'helm.sh/hook': post-install,pre-upgrade
+
+    # Xoá Job cũ ngay trước khi tạo Job mới. Đây là thứ trị dứt điểm
+    # `field is immutable` — chính là dòng `kubectl delete` thủ công ở 3.3.
+    # KHÔNG dùng hook-succeeded: giữ Job lại để còn đọc log sau khi chạy.
+    'helm.sh/hook-delete-policy': before-hook-creation
+spec:
+  backoffLimit: 3
+
+  template:
+    spec:
+      restartPolicy: Never
+
+      # Job có thể được tạo trước khi Postgres kịp sẵn sàng. Chờ ở đây
+      # rẻ hơn nhiều so với để migration fail rồi dựa vào backoffLimit.
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.postgres.image | quote }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -U {{ .Values.postgres.auth.user }}; do sleep 2; done
+
+      containers:
+        - name: migrate
+          # Cùng image với app: migration nằm trong prisma/migrations của
+          # chính commit đó. Dùng image khác là chạy nhầm phiên bản.
+          image: {{ include "elearning.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ['npx', 'prisma', 'migrate', 'deploy']
+          envFrom:
+            - secretRef:
+                name: api
