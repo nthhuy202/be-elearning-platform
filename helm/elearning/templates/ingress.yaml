@@ -16,3 +16,8 @@ spec:
                 name: api
                 port:
                   number: 8080
+      # `with` chỉ chạy khi giá trị không rỗng, và đổi `.` thành chính nó.
+      # Không khai host -> khớp mọi hostname.
+      {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}

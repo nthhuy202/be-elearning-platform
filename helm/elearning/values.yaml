@@ -1,3 +1,48 @@
-# Bước 4.0 chưa tham số hoá gì cả — cố ý.
-# Mục tiêu bước này: chứng minh chart render ra ĐÚNG thứ đang chạy,
-# trước khi bắt đầu thay giá trị bằng biến ở 4.1.
+image:
+  repository: elearning-api
+  # Để trống -> lấy appVersion trong Chart.yaml. Deploy 1 tag cụ thể:
+  #   helm upgrade ... --set image.tag=<sha>
+  tag: ''
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+ingress:
+  # Rỗng = khớp mọi hostname (gõ localhost là vào).
+  host: ''
+
+# Key ở đây chính là tên biến môi trường, không dịch qua lại.
+env:
+  NODE_ENV: production
+  PORT: '8080'
+  JWT_EXPIRES_IN: 1h
+  VNPAY_TMN_CODE: TESTTMN
+  VNPAY_PAY_URL: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  VNPAY_RETURN_URL: http://localhost/payments/vnpay/return
+
+# Vẫn là plaintext, y như Phase 3. Phase 5 chuyển sang Sealed Secrets.
+# DATABASE_URL KHÔNG nằm ở đây — nó được ghép từ postgres.auth bên dưới.
+secrets:
+  JWT_SECRET: dev-secret-doi-o-phase-5
+  VNPAY_HASH_SECRET: TESTHASHSECRET
+
+postgres:
+  image: postgres:17-alpine
+  storage: 2Gi
+  auth:
+    user: postgres
+    password: postgres
+    database: elearning
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
