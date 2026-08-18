@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api
+data:
+  # Mọi value trong ConfigMap PHẢI là chuỗi. Viết PORT: 8080 không nháy kép
+  # thì YAML hiểu là số và K8s từ chối: "cannot unmarshal number into string".
+  NODE_ENV: 'production'
+  PORT: '8080'
+  JWT_EXPIRES_IN: '1h'
+  VNPAY_TMN_CODE: 'TESTTMN'
+  VNPAY_PAY_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
+  VNPAY_RETURN_URL: 'http://localhost/payments/vnpay/return'
+---
+# Giá trị dev cho cluster local. Phase 5 chuyển sang Sealed Secrets.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api
+type: Opaque
+stringData:
+  # Tên host là tên Service ở 3.1, cùng namespace nên gọi trống không được.
+  DATABASE_URL: 'postgresql://postgres:postgres@postgres:5432/elearning?schema=public'
+  JWT_SECRET: 'dev-secret-doi-o-phase-5'
+  VNPAY_HASH_SECRET: 'TESTHASHSECRET'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2
+
+  # maxUnavailable: 0 = không bao giờ tụt dưới 2 pod sẵn sàng.
+  # maxSurge: 1 = được phép dựng tạm pod thứ 3 trong lúc thay.
+  # Đây mới là thứ làm nên "không downtime", không phải replicas.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          # Tag bất biến theo commit SHA — đúng thứ dựng ra ở bước 2.4.
+          # Đổi đúng dòng này chính là "deploy". Không bao giờ dùng :latest.
+          image: elearning-api:3.4
+          imagePullPolicy: IfNotPresent
+
+          envFrom:
+            - configMapRef:
+                name: api
+            - secretRef:
+                name: api
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          # requests = scheduler dùng để xếp chỗ, và là mức được bảo đảm.
+          # limits chỉ đặt cho memory: vượt -> container bị OOMKilled ngay,
+          # sai rõ ràng, dễ debug.
+          # CỐ Ý KHÔNG đặt limits.cpu: CPU là compressible resource, chạm
+          # limit thì bị throttle (chậm dần, p99 xấu, probe timeout) chứ
+          # không chết — triệu chứng mơ hồ, tốn hàng giờ mò. Cứ để nó mượn
+          # CPU rảnh của node.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+
+          # Giữa lúc xoá pod, K8s làm SONG SONG hai việc: gỡ pod khỏi
+          # Endpoints, và gửi SIGTERM. Ingress có thể chưa kịp biết mà vẫn
+          # đẩy request vào pod đang tắt -> 502. sleep 5 hoãn SIGTERM để
+          # Endpoints kịp lan.
+          lifecycle:
+            preStop:
+              exec:
+                command: ['sleep', '5']
+
+          # Chạy trước, và tạm dừng hai probe kia cho tới khi nó xanh.
+          # Container giờ chỉ boot Nest, không migrate nữa -> ngưỡng thấp là đủ.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 3
+            failureThreshold: 10
+
+          # Còn sống không? Không đụng DB — DB chết thì giết app là sai.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+
+          # Nhận request được chưa? Có đụng DB (SELECT 1).
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8080
+      targetPort: http
