@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: elearning
+  # BẮT BUỘC nằm ở namespace của ArgoCD, không phải namespace của app.
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/nthhuy202/be-elearning-platform.git
+    targetRevision: main
+    path: helm/elearning
+    # Không khai `helm:` gì thêm -> ArgoCD tự dùng values.yaml trong chart.
+    # Mọi cấu hình vẫn nằm đúng một chỗ, y như khi chạy helm tay.
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: elearning
+
+  syncPolicy:
+    automated:
+      # Xoá resource đã bị gỡ khỏi git. Không bật thì git xoá mà cluster giữ.
+      prune: true
+      # Tự vá khi có người sửa tay bằng kubectl. Đây là "self-healing".
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
