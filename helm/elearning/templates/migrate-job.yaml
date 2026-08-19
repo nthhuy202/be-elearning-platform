@@ -3,14 +3,18 @@ kind: Job
 metadata:
   name: migrate
   annotations:
-    # post-install: lần cài đầu, Postgres phải tồn tại trước đã.
-    # pre-upgrade: các lần sau, migration chạy TRƯỚC khi pod code mới lên.
-    'helm.sh/hook': post-install,pre-upgrade
+    # ArgoCD dịch pre-upgrade -> PreSync (chạy TRƯỚC mọi resource), và không
+    # phân biệt install với upgrade như Helm. Để pre-upgrade ở đây thì lần
+    # sync đầu Job chờ Postgres chưa tồn tại -> kẹt vĩnh viễn.
+    # PostSync chạy sau khi mọi resource đã Healthy, đúng cho cả hai trường hợp.
+    'argocd.argoproj.io/hook': PostSync
+    'argocd.argoproj.io/hook-delete-policy': BeforeHookCreation
 
-    # Xoá Job cũ ngay trước khi tạo Job mới. Đây là thứ trị dứt điểm
-    # `field is immutable` — chính là dòng `kubectl delete` thủ công ở 3.3.
-    # KHÔNG dùng hook-succeeded: giữ Job lại để còn đọc log sau khi chạy.
+    # Helm (chạy tay) vẫn dùng annotation của nó — hai hệ thống đọc hai key
+    # khác nhau nên khai cả hai là an toàn, không xung đột.
+    'helm.sh/hook': post-install,pre-upgrade
     'helm.sh/hook-delete-policy': before-hook-creation
+
 spec:
   backoffLimit: 3
 
