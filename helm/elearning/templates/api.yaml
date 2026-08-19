@@ -9,21 +9,6 @@ data:
   {{- end }}
 ---
 apiVersion: v1
-kind: Secret
-metadata:
-  name: api
-type: Opaque
-stringData:
-  # Ghép từ postgres.auth thay vì chép tay: đổi mật khẩu DB ở một chỗ,
-  # cả Postgres lẫn connection string của app cùng đổi theo.
-  DATABASE_URL: {{ printf "postgresql://%s:%s@postgres:5432/%s?schema=public"
-                    .Values.postgres.auth.user
-                    .Values.postgres.auth.password
-                    .Values.postgres.auth.database | quote }}
-  {{- range $key, $value := .Values.secrets }}
-  {{ $key }}: {{ $value | quote }}
-  {{- end }}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:

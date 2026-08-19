@@ -32,6 +32,9 @@ env:
 secrets:
   JWT_SECRET: dev-secret-doi-o-phase-5
   VNPAY_HASH_SECRET: TESTHASHSECRET
+postgres:
+  auth:
+    password: postgres
 
 postgres:
   image: postgres:17-alpine
