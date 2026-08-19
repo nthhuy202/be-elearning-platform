@@ -117,3 +117,30 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  bump:
+    runs-on: ubuntu-latest
+    needs: docker
+    # Chỉ chạy khi đã thực sự push image lên ghcr. PR không bump.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump image tag in values.yaml
+        run: |
+          sed -i "s|^  tag: .*|  tag: ${{ github.sha }}|" helm/elearning/values.yaml
+          grep -A1 'repository:' helm/elearning/values.yaml
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add helm/elearning/values.yaml
+          # Không có gì đổi (vd: chạy lại workflow) thì thoát êm, không fail.
+          git diff --staged --quiet && exit 0
+          git commit -m "chore: bump image tag to ${{ github.sha }} [skip ci]"
+          git push
