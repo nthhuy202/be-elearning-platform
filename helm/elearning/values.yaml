@@ -1,8 +1,8 @@
 image:
-  repository: elearning-api
-  # Để trống -> lấy appVersion trong Chart.yaml. Deploy 1 tag cụ thể:
-  #   helm upgrade ... --set image.tag=<sha>
-  tag: ''
+  repository: ghcr.io/nthhuy202/be-elearning-platform
+  # Tag bất biến theo commit SHA. Từ 5.3, CI sẽ tự sửa đúng dòng này —
+  # nên nó phải là giá trị THẬT trong git, không còn để rỗng lấy appVersion.
+  tag: b6beff052b70007c2ad91fa3fe5326768da2344a
   pullPolicy: IfNotPresent
 
 replicaCount: 2

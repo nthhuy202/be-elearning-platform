@@ -8,4 +8,4 @@ version: 0.1.0
 
 # Version CỦA APP bên trong — bám theo tag image.
 # Hai số này độc lập: sửa resources mà không đổi code thì chỉ version tăng.
-appVersion: '3.4'
+appVersion: 'b6beff0'
