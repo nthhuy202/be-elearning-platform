@@ -127,36 +127,23 @@ jobs:
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore: bump image tag')
 
-    permissions:
-      contents: write
-      pull-requests: write
+    permissions: {}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CD_BUMP_TOKEN }} 
 
       - name: Bump image tag in values.yaml
         run: |
           sed -i "s|^  tag: .*|  tag: ${{ github.sha }}|" helm/elearning/values.yaml
           grep -A1 'repository:' helm/elearning/values.yaml
 
-      - name: Commit, open PR and auto-merge
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and push 
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add helm/elearning/values.yaml
-          # Chạy lại workflow cũ thì sed không đổi gì -> thoát êm.
           git diff --staged --quiet && exit 0
-
-          BRANCH="bump/${{ github.sha }}"
-          git checkout -b "$BRANCH"
-          git commit -m "chore: bump image tag to ${{ github.sha }}"
-          git push -u origin "$BRANCH" --force
-
-
-          gh pr create --base main --head "$BRANCH" \
-            --title "chore: bump image tag to ${{ github.sha }}" \
-            --body "Tự động sinh sau khi image đã lên ghcr. ArgoCD sẽ sync sau khi merge."
-
-          gh pr merge "$BRANCH" --squash --auto --delete-branch
+          git commit -m "chore: bump image tag to ${{ github.sha }} [skip ci]"
+          git push
