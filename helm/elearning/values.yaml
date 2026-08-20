@@ -33,9 +33,10 @@ postgres:
 postgres:
   image: postgres:17-alpine
   storage: 2Gi
-  auth:
-    user: postgres
-    database: elearning
+  # Không phải secret — dùng cho pg_isready ở readinessProbe và initContainer.
+  # Mật khẩu nằm trong templates/sealed-secret-postgres.yaml.
+  user: postgres
+  database: elearning
   resources:
     requests:
       cpu: 100m
