@@ -9,10 +9,15 @@ replicaCount: 2
 
 resources:
   requests:
-    cpu: 100m
-    memory: 256Mi
+    # Đo được ~8.6m lúc nhàn rỗi (Grafana, 20/08/2026). Đặt 25m để có dư
+    # cho khởi động và tải nhẹ, vẫn thấp hơn 100m cũ 4 lần.
+    cpu: 25m
+    # Đo được ~66 MiB. Node.js heap phình dần trước khi GC nên để dư ~50%.
+    memory: 128Mi
   limits:
-    memory: 512Mi
+    # Không đặt limits.cpu: CPU là compressible, chạm limit thì throttle
+    # âm thầm chứ không chết -> triệu chứng mơ hồ.
+    memory: 384Mi
 
 ingress:
   # Rỗng = khớp mọi hostname (gõ localhost là vào).
@@ -28,9 +33,6 @@ env:
   VNPAY_RETURN_URL: http://localhost/payments/vnpay/return
 
 postgres:
-  auth:
-
-postgres:
   image: postgres:17-alpine
   storage: 2Gi
   # Không phải secret — dùng cho pg_isready ở readinessProbe và initContainer.
@@ -39,7 +41,10 @@ postgres:
   database: elearning
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      # Đo được 4.7m / 25.7 MiB lúc nhàn rỗi (Grafana, 20/08/2026).
+      cpu: 25m
+      memory: 128Mi
     limits:
+      # Postgres đang nhẹ vì gần như không có dữ liệu. Nó sẽ ăn nhiều hơn
+      # hẳn khi shared_buffers được dùng thật -> để dư rộng.
       memory: 512Mi
