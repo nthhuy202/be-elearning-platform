@@ -30,7 +30,7 @@ spec:
           command:
             - sh
             - -c
-            - until pg_isready -h postgres -U {{ .Values.postgres.auth.user }}; do sleep 2; done
+            - until pg_isready -h postgres -U {{ .Values.postgres.user }}; do sleep 2; done
 
       containers:
         - name: migrate
