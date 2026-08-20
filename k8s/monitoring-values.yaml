@@ -1,0 +1,42 @@
+# Cấu hình cho cluster kind một node. KHÔNG dùng cho production.
+
+prometheus:
+  prometheusSpec:
+    # Giữ 3 ngày là đủ để so trước/sau khi chỉnh resources ở 6.4.
+    retention: 3d
+
+    # Mặc định chart CHỈ scrape ServiceMonitor có nhãn release=<tên release>.
+    # Đặt false để nó nhận mọi ServiceMonitor trong cluster — 6.1 khai
+    # ServiceMonitor trong chart elearning, không mang nhãn đó.
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+grafana:
+  adminPassword: admin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+
+alertmanager:
+  # Chưa có nơi để gửi alert. Bật lại ở 6.4 nếu muốn thử.
+  enabled: false
+
+# kind không cho truy cập metric của control-plane theo cách chuẩn.
+# Để bật sẽ có 4 target đỏ vĩnh viễn, làm nhiễu tín hiệu thật.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
