@@ -35,8 +35,26 @@ const PAYMENT_SELECT = {
   course: { select: { id: true, title: true } },
 };
 
+const IPN_RESULTS = [
+  'succeeded',
+  'failed',
+  'invalid_signature',
+  'not_found',
+  'amount_mismatch',
+  'already_confirmed',
+  'error',
+] as const;
+
 @Injectable()
 export class PaymentsService {
+  onModuleInit() {
+    // Counter chỉ tồn tại sau lần inc() đầu tiên. Khởi tạo về 0 để alert và
+    // dashboard phân biệt được "chưa có sự kiện" với "app không chạy".
+    for (const result of IPN_RESULTS) {
+      this.paymentEvents.inc({ provider: 'vnpay', result }, 0);
+    }
+  }
+
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
@@ -135,7 +153,8 @@ export class PaymentsService {
           result: 'invalid_signature',
         });
         this.logger.warn(
-          `IPN sai chữ ký, vnp_TxnRef=${query.vnp_TxnRef ?? 'unknown'}`,
+          { txnRef: query.vnp_TxnRef ?? null },
+          'IPN sai chữ ký',
         );
         return VNPAY_IPN_RESPONSE.INVALID_SIGNATURE;
       }
@@ -162,7 +181,12 @@ export class PaymentsService {
           result: 'amount_mismatch',
         });
         this.logger.error(
-          `IPN lệch số tiền, paymentId=${payment.id}, nhận=${query.vnp_Amount}, mong đợi=${payment.amount * 100}`,
+          {
+            paymentId: payment.id,
+            received: Number(query.vnp_Amount),
+            expected: payment.amount * 100,
+          },
+          'IPN lệch số tiền',
         );
         return VNPAY_IPN_RESPONSE.INVALID_AMOUNT;
       }
@@ -175,7 +199,8 @@ export class PaymentsService {
 
         this.paymentEvents.inc({ provider: 'vnpay', result: 'failed' });
         this.logger.warn(
-          `Thanh toán thất bại, paymentId=${payment.id}, mã=${query.vnp_ResponseCode}`,
+          { paymentId: payment.id, responseCode: query.vnp_ResponseCode },
+          'Thanh toán thất bại',
         );
 
         return VNPAY_IPN_RESPONSE.SUCCESS;
@@ -204,7 +229,12 @@ export class PaymentsService {
 
       this.paymentEvents.inc({ provider: 'vnpay', result: 'succeeded' });
       this.logger.log(
-        `Thanh toán thành công, paymentId=${payment.id}, userId=${payment.userId}, courseId=${payment.courseId}`,
+        {
+          paymentId: payment.id,
+          userId: payment.userId,
+          courseId: payment.courseId,
+        },
+        'Thanh toán thành công',
       );
 
       return VNPAY_IPN_RESPONSE.SUCCESS;
