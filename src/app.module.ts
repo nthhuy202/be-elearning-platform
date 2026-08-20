@@ -15,6 +15,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
+import { LoggerModule } from 'nestjs-pino';
 
 @Module({
   imports: [
@@ -27,6 +28,39 @@ import { MetricsInterceptor } from './metrics/metrics.interceptor';
       // giữa chừng. Không thể override guard này từ testing module vì Nest
       // đăng ký APP_GUARD dưới một token có UUID ngẫu nhiên.
       skipIf: () => process.env.NODE_ENV === 'test',
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        // Dev: đọc được bằng mắt. Production: JSON một dòng cho máy đọc.
+        transport:
+          process.env.NODE_ENV === 'production'
+            ? undefined
+            : { target: 'pino-pretty', options: { singleLine: true } },
+
+        // Không log request tới /metrics và /health — Prometheus gọi 2 lần/phút
+        // và kubelet gọi liên tục, chúng sẽ nhấn chìm log thật.
+        autoLogging: {
+          ignore: (req) => {
+            const url = (req as { url?: string }).url ?? '';
+            return url.startsWith('/metrics') || url.startsWith('/health');
+          },
+        },
+
+        // KHÔNG BAO GIỜ log những trường này. CLAUDE.md: "Không log dữ liệu
+        // nhạy cảm: password, token, mã OTP, thông tin thanh toán, secret key."
+        redact: {
+          paths: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'req.body.password',
+            'req.body.newPassword',
+            'req.body.currentPassword',
+            'req.body.token',
+            'res.headers["set-cookie"]',
+          ],
+          censor: '[REDACTED]',
+        },
+      },
     }),
     PrismaModule,
     UsersModule,
