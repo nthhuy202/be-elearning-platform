@@ -27,21 +27,14 @@ env:
   VNPAY_PAY_URL: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   VNPAY_RETURN_URL: http://localhost/payments/vnpay/return
 
-# Vẫn là plaintext, y như Phase 3. Phase 5 chuyển sang Sealed Secrets.
-# DATABASE_URL KHÔNG nằm ở đây — nó được ghép từ postgres.auth bên dưới.
-secrets:
-  JWT_SECRET: dev-secret-doi-o-phase-5
-  VNPAY_HASH_SECRET: TESTHASHSECRET
 postgres:
   auth:
-    password: postgres
 
 postgres:
   image: postgres:17-alpine
   storage: 2Gi
   auth:
     user: postgres
-    password: postgres
     database: elearning
   resources:
     requests:

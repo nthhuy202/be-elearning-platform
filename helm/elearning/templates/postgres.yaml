@@ -2,15 +2,6 @@
 # KHÔNG phải nơi để mật khẩu thật: Secret của K8s chỉ là base64, không mã hoá.
 # Phase 5 (deploy thật) sẽ chuyển sang Sealed Secrets.
 apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres
-type: Opaque
-stringData:
-  POSTGRES_USER: {{ .Values.postgres.auth.user | quote }}
-  POSTGRES_PASSWORD: {{ .Values.postgres.auth.password | quote }}
-  POSTGRES_DB: {{ .Values.postgres.auth.database | quote }}
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -56,7 +47,7 @@ spec:
               containerPort: 5432
           readinessProbe:
             exec:
-              command: ['pg_isready', '-U', '{{ .Values.postgres.auth.user }}', '-d', '{{ .Values.postgres.auth.database }}']
+                ['pg_isready', '-U', '{{ .Values.postgres.user }}', '-d', '{{ .Values.postgres.database }}']
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
