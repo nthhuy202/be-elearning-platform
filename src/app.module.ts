@@ -39,12 +39,7 @@ import { LoggerModule } from 'nestjs-pino';
 
         // Không log request tới /metrics và /health — Prometheus gọi 2 lần/phút
         // và kubelet gọi liên tục, chúng sẽ nhấn chìm log thật.
-        autoLogging: {
-          ignore: (req) => {
-            const url = (req as { url?: string }).url ?? '';
-            return url.startsWith('/metrics') || url.startsWith('/health');
-          },
-        },
+        autoLogging: false,
 
         // KHÔNG BAO GIỜ log những trường này. CLAUDE.md: "Không log dữ liệu
         // nhạy cảm: password, token, mã OTP, thông tin thanh toán, secret key."
