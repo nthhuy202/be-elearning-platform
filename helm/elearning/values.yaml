@@ -2,7 +2,7 @@ image:
   repository: ghcr.io/nthhuy202/be-elearning-platform
   # Tag bất biến theo commit SHA. Từ 5.3, CI sẽ tự sửa đúng dòng này —
   # nên nó phải là giá trị THẬT trong git, không còn để rỗng lấy appVersion.
-  tag: 5ed8c4d28a76f78edfa5fd09b6c409da434d3856
+  tag: 426826ef26543c85e709fa202c628cc866b198dd
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -27,22 +27,16 @@ env:
   VNPAY_PAY_URL: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   VNPAY_RETURN_URL: http://localhost/payments/vnpay/return
 
-# Vẫn là plaintext, y như Phase 3. Phase 5 chuyển sang Sealed Secrets.
-# DATABASE_URL KHÔNG nằm ở đây — nó được ghép từ postgres.auth bên dưới.
-secrets:
-  JWT_SECRET: OlEUvzMy5FSagj7NF7B1ak1wvpLfaK46zu6TvFOh66C8CT1K2JWqzC5ThzlTpoV/
-  VNPAY_HASH_SECRET: TESTHASHSECRET
 postgres:
   auth:
-    password: postgres
 
 postgres:
   image: postgres:17-alpine
   storage: 2Gi
-  auth:
-    user: postgres
-    password: postgres
-    database: elearning
+  # Không phải secret — dùng cho pg_isready ở readinessProbe và initContainer.
+  # Mật khẩu nằm trong templates/sealed-secret-postgres.yaml.
+  user: postgres
+  database: elearning
   resources:
     requests:
       cpu: 100m
