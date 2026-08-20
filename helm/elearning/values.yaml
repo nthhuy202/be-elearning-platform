@@ -2,7 +2,7 @@ image:
   repository: ghcr.io/nthhuy202/be-elearning-platform
   # Tag bất biến theo commit SHA. Từ 5.3, CI sẽ tự sửa đúng dòng này —
   # nên nó phải là giá trị THẬT trong git, không còn để rỗng lấy appVersion.
-  tag: a21b82179c5420f4d42c4c99cc0314b6d726d1b9
+  tag: 9d722643f2c9e104b16a28f7e4cf470f082e80c2
   pullPolicy: IfNotPresent
 
 replicaCount: 2
