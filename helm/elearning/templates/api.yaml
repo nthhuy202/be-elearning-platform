@@ -13,6 +13,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
+  labels:
+    app: api
 spec:
   replicas: {{ .Values.replicaCount }}
 
@@ -87,6 +89,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api
+  # ServiceMonitor tìm Service qua label này. Không có -> Prometheus
+  # không biết scrape ở đâu, và KHÔNG báo lỗi gì.
+  labels:
+    app: api
 spec:
   selector:
     app: api
