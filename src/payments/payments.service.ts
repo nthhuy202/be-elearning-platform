@@ -20,6 +20,8 @@ import { PaymentProvider, PaymentStatus } from 'generated/prisma/enums';
 import { buildPaginatedResult } from 'src/common/utils/pagination.util';
 import { QueryPaymentDto } from './dto/query-payment.dto';
 import { randomBytes } from 'crypto';
+import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import { Counter } from 'prom-client';
 
 const PAYMENT_SELECT = {
   id: true,
@@ -40,6 +42,8 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vnpayService: VnpayService,
+    @InjectMetric('payment_events_total')
+    private readonly paymentEvents: Counter<string>,
   ) {}
 
   async create(userId: string, dto: CreatePaymentDto, ipAddress: string) {
@@ -126,6 +130,10 @@ export class PaymentsService {
   async handleVnpayIpn(query: Record<string, string>) {
     try {
       if (!this.vnpayService.isSignatureValid(query)) {
+        this.paymentEvents.inc({
+          provider: 'vnpay',
+          result: 'invalid_signature',
+        });
         this.logger.warn(
           `IPN sai chữ ký, vnp_TxnRef=${query.vnp_TxnRef ?? 'unknown'}`,
         );
@@ -135,15 +143,24 @@ export class PaymentsService {
       const payment = await this.findByTxnRef(query.vnp_TxnRef);
 
       if (!payment) {
+        this.paymentEvents.inc({ provider: 'vnpay', result: 'not_found' });
         this.logger.warn(`IPN không tìm thấy giao dịch ${query.vnp_TxnRef}`);
         return VNPAY_IPN_RESPONSE.ORDER_NOT_FOUND;
       }
 
       if (payment.status !== PaymentStatus.PENDING) {
+        this.paymentEvents.inc({
+          provider: 'vnpay',
+          result: 'already_confirmed',
+        });
         return VNPAY_IPN_RESPONSE.ORDER_ALREADY_CONFIRMED;
       }
 
       if (Number(query.vnp_Amount) !== payment.amount * 100) {
+        this.paymentEvents.inc({
+          provider: 'vnpay',
+          result: 'amount_mismatch',
+        });
         this.logger.error(
           `IPN lệch số tiền, paymentId=${payment.id}, nhận=${query.vnp_Amount}, mong đợi=${payment.amount * 100}`,
         );
@@ -156,6 +173,7 @@ export class PaymentsService {
           data: { status: PaymentStatus.FAILED },
         });
 
+        this.paymentEvents.inc({ provider: 'vnpay', result: 'failed' });
         this.logger.warn(
           `Thanh toán thất bại, paymentId=${payment.id}, mã=${query.vnp_ResponseCode}`,
         );
@@ -184,12 +202,14 @@ export class PaymentsService {
         }),
       ]);
 
+      this.paymentEvents.inc({ provider: 'vnpay', result: 'succeeded' });
       this.logger.log(
         `Thanh toán thành công, paymentId=${payment.id}, userId=${payment.userId}, courseId=${payment.courseId}`,
       );
 
       return VNPAY_IPN_RESPONSE.SUCCESS;
     } catch (error) {
+      this.paymentEvents.inc({ provider: 'vnpay', result: 'error' });
       this.logger.error(
         `Lỗi xử lý IPN, vnp_TxnRef=${query.vnp_TxnRef ?? 'unknown'}`,
         error instanceof Error ? error.stack : undefined,
