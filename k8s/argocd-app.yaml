@@ -26,3 +26,13 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  
+  ignoreDifferences:
+    # volumeClaimTemplates là field bất biến; API server điền thêm default
+    # (metadata, status) khiến bản render và bản thật không bao giờ khớp.
+    # Không bỏ qua thì Application OutOfSync vĩnh viễn dù chạy hoàn toàn đúng.
+    - group: apps
+      kind: StatefulSet
+      name: postgres
+      jsonPointers:
+        - /spec/volumeClaimTemplates
