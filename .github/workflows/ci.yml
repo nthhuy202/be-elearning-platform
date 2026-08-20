@@ -92,6 +92,10 @@ jobs:
           ! grep -rn '<<<<<<<\|>>>>>>>' helm/
           helm lint helm/elearning
           helm template elearning helm/elearning > /dev/null
+      - name: No duplicate top-level keys in values
+        run: |
+          ! grep -oE '^[a-zA-Z_-]+:' helm/elearning/values.yaml | sort | uniq -d | grep .
+
 
   docker:
     runs-on: ubuntu-latest
