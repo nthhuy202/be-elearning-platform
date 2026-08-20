@@ -13,6 +13,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { THROTTLE } from './common/constants';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
     PaymentsModule,
     NotificationsModule,
     HealthModule,
+    MetricsModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

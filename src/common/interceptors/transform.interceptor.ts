@@ -39,7 +39,10 @@ export class TransformInterceptor<T> implements NestInterceptor<
       [context.getHandler(), context.getClass()],
     );
 
-    if (skipTransform) {
+    // /metrics trả text thuần theo định dạng Prometheus. Controller của nó do
+    // @willsoto/nestjs-prometheus cung cấp nên không gắn @SkipTransform() được
+    // -> loại theo đường dẫn.
+    if (skipTransform || request.path === '/metrics') {
       return next.handle();
     }
 
