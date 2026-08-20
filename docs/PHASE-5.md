@@ -509,6 +509,47 @@ docker exec elearning-control-plane crictl pull <image>
 | `fatal: ambiguous argument 'origin\main;.github\...'` | MSYS dịch `<ref>:<path>` thành đường dẫn Windows | `MSYS_NO_PATHCONV=1 git show ...` |
 | Merge conflict `both added` khi merge nhánh chồng nhánh | PR merge kiểu squash | `git rebase --onto origin/main <nhánh-dưới>` |
 | Commit rơi thẳng vào `main` local | Quên tạo nhánh trước khi sửa | `git branch --show-current` trước mỗi commit |
+| `SYNC STATUS: Unknown` | ArgoCD **không render được chart** nên không so sánh được | `kubectl get application <n> -n argocd -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}'` |
+| `pg_isready -U '' -d ''`, nhưng vẫn `Healthy` | Helm trả **chuỗi rỗng** cho `.Values.x` không tồn tại, **không báo lỗi** | Dùng `required` cho giá trị mà rỗng sẽ hỏng âm thầm |
+| Marker `<<<<<<< HEAD` commit thẳng vào chart | CI không kiểm chart → không ai chặn | Job `helm` trong CI (xem dưới) |
+| `StatefulSet OutOfSync` vĩnh viễn dù chạy đúng | Thụt lề/cấu trúc YAML khác với dạng chuẩn hoá của API server | `argocd app diff <app>` — công cụ **duy nhất** chỉ ra được |
+
+### Ba lỗi cùng một dòng — và vì sao không công cụ nào bắt được
+
+Dòng `readinessProbe` của Postgres phải sửa **ba vòng merge** liên tiếp:
+
+| Vòng | Sai gì | `helm lint` | `helm template` | `kubectl apply` | `argocd app diff` |
+|---|---|---|---|---|---|
+| 1 | `.Values.postgres.auth.user` không còn tồn tại → render ra `-U ''` | ✅ qua | ✅ qua | ✅ qua | ❌ bắt |
+| 2 | Mất hẳn key `command:` dưới `exec:` | ✅ qua | ✅ qua | ✅ qua | ❌ bắt |
+| 3 | `command:` thụt 16 space thay vì 14 | ✅ qua | ✅ qua | ✅ qua | ❌ bắt |
+
+Cả ba đều là YAML **hợp lệ**, và cả ba đều **chạy đúng trong cluster** — API server chuẩn
+hoá lại hết. Nhưng ArgoCD so sánh **văn bản đã render** với **văn bản trong cluster**, nên
+mọi khác biệt hình thức đều thành `OutOfSync` vĩnh viễn.
+
+Bài học: **ArgoCD so cấu trúc, không so ngữ nghĩa Kubernetes.** Sau mỗi lần sửa chart, chạy
+`argocd app diff` **trước khi commit**, không phải sau khi merge.
+
+### Lưới an toàn đã thêm vào CI
+
+Bốn vòng merge của phase này đều do lỗi mà một job 10 giây bắt được:
+
+```yaml
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No merge conflict markers
+        run: '! grep -rn "<<<<<<<\|>>>>>>>" helm/'
+      - name: Lint and render chart
+        run: |
+          helm lint helm/elearning
+          helm template elearning helm/elearning > /dev/null
+```
+
+Và `docker` đổi thành `needs: [check, e2e, helm]` — chart hỏng thì không tốn công build
+image.
 
 ### Thói quen rút ra
 
@@ -518,6 +559,24 @@ docker exec elearning-control-plane crictl pull <image>
   sắp commit.
 - **Sửa file local không còn tác dụng gì.** ArgoCD đọc `main` trên GitHub. Vòng lặp từ giờ
   là: sửa → commit → push → **merge** → ArgoCD mới thấy.
+- **`git pull` trên `main` luôn hỏng ở repo dùng squash merge.** Sau mỗi PR, `main` local có
+  commit "lạc" mà git coi là khác bản squash trên remote, dù nội dung y hệt. Đã gây rắc rối
+  bốn lần trong phase này. Dùng thay thế:
+
+  ```bash
+  git config --global alias.sync '!git fetch origin && git checkout -B main origin/main'
+  ```
+
+  `-B` **đồng bộ**, không hợp nhất — đúng với thực tế `main` local không bao giờ cần có gì
+  riêng.
+- **Không in secret ra màn hình.** Đếm độ dài thay vì xem giá trị:
+
+  ```bash
+  kubectl get secret api -n elearning -o jsonpath='{.data.JWT_SECRET}' | base64 -d | wc -c
+  ```
+
+- **`k8s/argocd-app.yaml` phải `kubectl apply` bằng tay.** ArgoCD quản lý `helm/elearning`,
+  **không quản lý chính nó**. Sửa file rồi merge mà quên apply thì không có gì đổi.
 
 ---
 
@@ -527,7 +586,9 @@ docker exec elearning-control-plane crictl pull <image>
 |---|---|---|
 | `main` nhận commit không qua PR (bot dùng PAT) | Commit do máy sinh, sửa một dòng, nội dung xác định bởi một commit khác đã qua PR + CI xanh | Cách triệt để: **tách repo cấu hình khỏi repo code** — quá sức cho dự án một người |
 | PAT là secret dài hạn, hết hạn sau 90 ngày | `GITHUB_TOKEN` không dùng được cho việc này | Đặt lịch gia hạn; hoặc GitHub App riêng |
-| Postgres Secret vẫn plaintext trong `values.yaml` | Niêm phong từng cái một để nếu hỏng còn biết hỏng ở đâu | Bước tiếp theo, cùng cách với `api` |
+| ~~Postgres Secret vẫn plaintext~~ | **Đã trả** — niêm phong xong, `values.yaml` không còn `password`/`secret` nào | — |
+| Chart không dùng `required` cho giá trị bắt buộc | Helm trả chuỗi rỗng thay vì báo lỗi, đã gây một vòng merge thừa | Áp `{{ required "..." .Values.x }}` cho `postgres.user`, `postgres.database`, `image.tag` |
+| `JWT_SECRET` cũ còn trong lịch sử git (commit `d9d3627`) | Đã xoay giá trị nên bản cũ vô dụng; cluster local, chỉ ký token của chính mình | Không dọn. Nếu lỡ commit secret **thật**: xoay trước, dọn lịch sử sau |
 | `migrate` chạy PostSync → code mới gặp schema cũ trong giây lát | ArgoCD không phân biệt install/upgrade | Chấp nhận vĩnh viễn; luật "chỉ thêm, không đổi/xoá" đủ che |
 | Private key Sealed Secrets chỉ có 1 bản backup thủ công | Cluster học | Nếu lên thật: backup tự động, mã hoá, off-site |
 | ArgoCD dùng mật khẩu admin mặc định, chỉ vào qua port-forward | Không phơi ra ngoài nên rủi ro thấp | Phase 7 nếu có: SSO, Ingress riêng |
@@ -548,7 +609,13 @@ docker exec elearning-control-plane crictl pull <image>
 4. **Bảo mật và tự động hoá kéo ngược nhau.** Bốn lớp bảo vệ ta tự dựng lên ở 2.5 chính là
    bốn lớp phải gỡ ở 5.3. Không có cấu hình nào "đúng" — chỉ có đánh đổi được ghi lại tử tế.
 5. **Đọc dòng lỗi trước khi đoán.** Sáu vòng thử ở 5.3 lẽ ra là hai, nếu bước đầu tiên luôn
-   là mở log job đỏ thay vì suy luận xem tầng nào chặn.
+   là mở log job đỏ thay vì suy luận xem tầng nào chặn. Lặp lại y hệt ở cuối phase: ba vòng
+   merge cho `readinessProbe` vì `ignoreDifferences` được đề xuất dựa trên phỏng đoán, thay
+   vì chạy `argocd app diff` trước.
+6. **Mỗi công cụ chỉ bắt được lớp lỗi của nó.** `helm lint` bắt cú pháp chart, `helm
+   template` bắt YAML hỏng, `kubectl apply` bắt schema sai, `argocd app diff` bắt lệch cấu
+   trúc. Ba lỗi liên tiếp ở `readinessProbe` lọt qua **cả ba** công cụ đầu vì chúng đều là
+   YAML hợp lệ và chạy đúng — chỉ công cụ thứ tư thấy.
 
 Và một ý lặp lại từ ba phase trước: nợ được ghi chép thì trả được. `image` lặp hai file
 (Phase 3) chết ở 4.1. Plaintext secret (Phase 4) chết ở 5.4. Bảng nợ của phase này cũng
